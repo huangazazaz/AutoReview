@@ -1,0 +1,29 @@
+# AutoTrade 全局配置文件
+datasource:
+  default: akshare
+  tushare:
+    token: ""  # 使用 Tushare 时在此填入 token
+
+cache:
+  enabled: true
+  dir: data/cache
+
+backtest:
+  initial_capital: 100000
+  fill_price: next_open
+  commission_rate: 0.0003
+  stamp_duty_rate: 0.001
+  slippage: 0.001
+  min_commission: 5.0
+  lot_size: 100
+  allow_t_plus_1: true
+  position_sizing: strength
+  max_positions: 1
+
+paths:
+  results_dir: data/results
+  cache_dir: data/cache
+
+logging:
+  level: INFO
+  file: data/logs/autotrade.log

@@ -1,0 +1,18 @@
+# AutoTrade 定时任务配置
+jobs:
+  - name: daily-scan
+    cron: "30 15 * * 1-5"        # 周一到周五 15:30
+    command:
+      type: scan
+      strategy: ma_cross
+      universe: all
+      top: 20
+    reporters: [console, csv]
+
+  - name: weekly-review
+    cron: "0 18 * * 5"           # 每周五 18:00
+    command:
+      type: backtest
+      strategy: macd_divergence
+      symbols: "000001,600519"
+    reporters: [console, csv]

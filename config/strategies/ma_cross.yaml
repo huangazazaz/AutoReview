@@ -1,0 +1,7 @@
+# 均线交叉策略参数
+strategy: ma_cross
+params:
+  fast: 5
+  slow: 20
+  stop_loss: 0.05
+  take_profit: 0.15

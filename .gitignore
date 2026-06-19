@@ -15,3 +15,4 @@ config/settings.local.yaml
 *.egg
 .pytest_cache/
 .ruff_cache/
+nul

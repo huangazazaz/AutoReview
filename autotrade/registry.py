@@ -66,7 +66,7 @@ def init_registry(force: bool = False) -> None:
     _strategies.clear()
     _reporters.clear()
 
-    _discover_plugins("autotrade.datasources", DataSource, _datasources)
+    _discover_plugins("autotrade.dataSources", DataSource, _datasources)
     _discover_plugins("autotrade.indicators", Indicator, _indicators)
     _discover_plugins("autotrade.strategies", Strategy, _strategies)
     _discover_plugins("autotrade.reporters", Reporter, _reporters)

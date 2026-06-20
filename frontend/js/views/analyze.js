@@ -565,6 +565,7 @@
                 {
                     type: 'value',
                     gridIndex: 0,
+                    position: 'right',
                     scale: true,
                     splitLine: { show: false },
                     axisLabel: {

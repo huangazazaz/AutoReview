@@ -642,8 +642,6 @@
 
         // 屏幕阅读器摘要
         const srSummaryId = 'analyze-equity-summary';
-        const closeStart = hasClosePrice && closes[0] != null ? closes[0].toFixed(2) : '';
-        const closeEnd = hasClosePrice && closes[closes.length - 1] != null ? closes[closes.length - 1].toFixed(2) : '';
         const nonNullCloses = closes.filter(v => v != null);
         const closeInfo = nonNullCloses.length > 0
             ? `，股价从${nonNullCloses[0].toFixed(2)}到${nonNullCloses[nonNullCloses.length - 1].toFixed(2)}`

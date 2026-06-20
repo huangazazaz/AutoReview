@@ -685,7 +685,7 @@
                     symbolRotate: 0,
                     itemStyle: { color: '#EF4444' },
                     label: { show: true, position: 'top', color: '#EF4444', fontSize: 10, fontWeight: 600,
-                             formatter: p => p.name },
+                             formatter: p => p.data?.name || 'B' },
                     z: 10,
                 }, {
                     name: '卖出',
@@ -698,7 +698,7 @@
                     symbolRotate: 180,
                     itemStyle: { color: '#22C55E' },
                     label: { show: true, position: 'bottom', color: '#22C55E', fontSize: 10, fontWeight: 600,
-                             formatter: p => p.name },
+                             formatter: p => p.data?.name || 'S' },
                     z: 10,
                 }] : []),
             ],

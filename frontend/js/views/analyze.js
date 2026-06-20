@@ -452,6 +452,20 @@
         const closes = dates.map(d => closeByDate[d] ?? null);
         const hasClosePrice = closes.some(v => v != null);
 
+        // 诊断日志：排查价格线不显示的原因
+        console.log('[analyze] bars count:', bars.length, 'equity curve points:', dates.length);
+        if (bars.length > 0) {
+            console.log('[analyze] first bar date:', bars[0]?.date, 'close:', bars[0]?.close);
+            console.log('[analyze] first equity date:', dates[0]);
+            console.log('[analyze] hasClosePrice:', hasClosePrice, 'matched closes:', closes.filter(v => v != null).length);
+            if (!hasClosePrice) {
+                console.warn('[analyze] 日期对齐失败！bars日期样本:', bars.slice(0, 3).map(b => b.date),
+                    'equity日期样本:', dates.slice(0, 3));
+            }
+        } else {
+            console.warn('[analyze] bars数据为空，无法叠加股价折线');
+        }
+
         // 计算摘要数据
         const finalEquity = equities[equities.length - 1];
         const totalReturn = initialCapital > 0 ? ((finalEquity - initialCapital) / initialCapital * 100) : 0;
@@ -463,7 +477,7 @@
         const option = {
             title: {
                 text: `${symbol}${stockName ? ' ' + stockName : ''} 净值曲线`,
-                subtext: `基准线 = 虚线 · 净值 = 紫色实线 · 股价 = 橙色实线 · 回撤 = 绿色区域`,
+                subtext: `基准线 = 虚线 · 净值 = 紫色实线 · 股价 = 橙色实线 · 回撤 = 绿色区域` + (bars.length > 0 && !hasClosePrice ? ' ⚠️ 价格数据日期未对齐' : '') + (bars.length === 0 ? ' ℹ️ 未加载价格数据' : ''),
                 left: 'center',
                 textStyle: { color: '#E2E8F0', fontSize: 13, fontWeight: 600 },
                 subtextStyle: { color: '#64748B', fontSize: 10 },

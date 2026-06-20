@@ -483,12 +483,15 @@
             const eq = equityByDate[t.date];
             if (eq == null) return;
             if (t.action === 'BUY') {
-                buyPoints.push({ value: [t.date, eq], name: 'B' });
+                buyPoints.push([t.date, eq]);
             } else if (t.action === 'SELL') {
-                sellPoints.push({ value: [t.date, eq], name: 'S' });
+                sellPoints.push([t.date, eq]);
             }
         });
         const hasTradeMarkers = buyPoints.length > 0 || sellPoints.length > 0;
+        console.log('[analyze] 买卖点: 买入', buyPoints.length, '卖出', sellPoints.length);
+        if (buyPoints.length > 0) console.log('[analyze] 首个买入点:', buyPoints[0]);
+        if (sellPoints.length > 0) console.log('[analyze] 首个卖出点:', sellPoints[0]);
 
         // 计算摘要数据
         const finalEquity = equities[equities.length - 1];
@@ -680,12 +683,13 @@
                     data: buyPoints,
                     xAxisIndex: 0,
                     yAxisIndex: 0,
+                    encode: { x: 0, y: 1 },
                     symbol: 'triangle',
                     symbolSize: 14,
                     symbolRotate: 0,
                     itemStyle: { color: '#EF4444' },
                     label: { show: true, position: 'top', color: '#EF4444', fontSize: 10, fontWeight: 600,
-                             formatter: p => p.data?.name || 'B' },
+                             formatter: 'B' },
                     z: 10,
                 }, {
                     name: '卖出',
@@ -693,12 +697,13 @@
                     data: sellPoints,
                     xAxisIndex: 0,
                     yAxisIndex: 0,
+                    encode: { x: 0, y: 1 },
                     symbol: 'triangle',
                     symbolSize: 14,
                     symbolRotate: 180,
                     itemStyle: { color: '#22C55E' },
                     label: { show: true, position: 'bottom', color: '#22C55E', fontSize: 10, fontWeight: 600,
-                             formatter: p => p.data?.name || 'S' },
+                             formatter: 'S' },
                     z: 10,
                 }] : []),
             ],

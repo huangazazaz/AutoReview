@@ -232,7 +232,7 @@
 
             const data = await safeAsync(() => API.analyze(params), '回测失败');
 
-            // 并行获取日线价格数据用于叠加股价折线
+            // 获取日线价格数据用于叠加股价折线（回测完成后获取，确保时间范围一致）
             let bars = [];
             if (data) {
                 const barsParams = { symbol: params.symbol };

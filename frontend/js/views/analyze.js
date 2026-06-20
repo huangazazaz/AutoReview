@@ -232,7 +232,9 @@
             btn.innerHTML = `${Loader({ size: 18 })} 回测中...`;
             showLoading('正在运行回测...');
 
+            console.log('[analyze] 开始回测...', params.symbol, params.strategy);
             const data = await safeAsync(() => API.analyze(params), '回测失败');
+            console.log('[analyze] 回测结果:', data ? 'success' : 'failed', 'equity_curve长度:', data?.equity_curve?.length || 0);
 
             // 获取日线价格数据用于叠加股价折线（回测完成后获取，确保时间范围一致）
             let bars = [];
@@ -254,6 +256,7 @@
     }
 
     function renderResults(data, bars = []) {
+        console.log('[analyze] renderResults 调用, bars长度:', bars.length);
         const _ = window.Icon || {};
         const TrendingUp = _.trendingUp || (() => '');
         const TrendingDown = _.trendingDown || (() => '');
@@ -429,6 +432,7 @@
     }
 
     function renderEquityChart(curve, symbol, stockName, initialCapital, bars = []) {
+        console.log('[analyze] renderEquityChart 调用, curve长度:', curve.length, 'bars长度:', bars.length);
         const dom = document.getElementById('analyze-equity-chart');
         if (!dom) return;
 

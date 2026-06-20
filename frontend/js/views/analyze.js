@@ -4,6 +4,8 @@
 (function () {
     'use strict';
 
+    console.log('[analyze] 模块加载 v2');
+
     let chartInstance = null;
 
     async function render(container) {

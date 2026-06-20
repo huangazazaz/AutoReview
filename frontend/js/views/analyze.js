@@ -427,12 +427,12 @@
 
         // 渲染净值曲线图
         if (equityCurve.length > 0 && typeof echarts !== 'undefined') {
-            renderEquityChart(equityCurve, data.symbol, data.stock_name, m.initial_capital || 0, bars);
+            renderEquityChart(equityCurve, data.symbol, data.stock_name, m.initial_capital || 0, bars, trades);
         }
     }
 
-    function renderEquityChart(curve, symbol, stockName, initialCapital, bars = []) {
-        console.log('[analyze] renderEquityChart 调用, curve长度:', curve.length, 'bars长度:', bars.length);
+    function renderEquityChart(curve, symbol, stockName, initialCapital, bars = [], trades = []) {
+        console.log('[analyze] renderEquityChart 调用, curve长度:', curve.length, 'bars长度:', bars.length, 'trades长度:', trades.length);
         const dom = document.getElementById('analyze-equity-chart');
         if (!dom) return;
 
@@ -472,6 +472,24 @@
             console.warn('[analyze] bars数据为空，无法叠加股价折线');
         }
 
+        // 构建日期→净值映射，用于买卖点定位
+        const equityByDate = Object.create(null);
+        dates.forEach((d, i) => { equityByDate[d] = equities[i]; });
+
+        // 提取买卖点坐标
+        const buyPoints = [];
+        const sellPoints = [];
+        trades.forEach(t => {
+            const eq = equityByDate[t.date];
+            if (eq == null) return;
+            if (t.action === 'BUY') {
+                buyPoints.push({ coord: [t.date, eq], name: 'B', value: t.price });
+            } else if (t.action === 'SELL') {
+                sellPoints.push({ coord: [t.date, eq], name: 'S', value: t.price });
+            }
+        });
+        const hasTradeMarkers = buyPoints.length > 0 || sellPoints.length > 0;
+
         // 计算摘要数据
         const finalEquity = equities[equities.length - 1];
         const totalReturn = initialCapital > 0 ? ((finalEquity - initialCapital) / initialCapital * 100) : 0;
@@ -491,7 +509,7 @@
             backgroundColor: '#1E293B',
             // 图例（色盲友好：每条线都有文字标签）
             legend: {
-                data: ['基准', '净值', '回撤', ...(hasClosePrice ? ['收盘价'] : [])],
+                data: ['基准', '净值', '回撤', ...(hasClosePrice ? ['收盘价'] : []), ...(hasTradeMarkers ? ['买入', '卖出'] : [])],
                 bottom: 0,
                 textStyle: { color: '#94A3B8', fontSize: 11 },
             },
@@ -655,6 +673,33 @@
                     itemStyle: { color: '#F59E0B' },
                     symbol: 'none',
                     z: 1,
+                }] : []),
+                ...(hasTradeMarkers ? [{
+                    name: '买入',
+                    type: 'scatter',
+                    data: buyPoints,
+                    xAxisIndex: 0,
+                    yAxisIndex: 0,
+                    symbol: 'triangle',
+                    symbolSize: 14,
+                    symbolRotate: 0,
+                    itemStyle: { color: '#EF4444' },
+                    label: { show: true, position: 'top', color: '#EF4444', fontSize: 10, fontWeight: 600,
+                             formatter: p => p.name },
+                    z: 10,
+                }, {
+                    name: '卖出',
+                    type: 'scatter',
+                    data: sellPoints,
+                    xAxisIndex: 0,
+                    yAxisIndex: 0,
+                    symbol: 'triangle',
+                    symbolSize: 14,
+                    symbolRotate: 180,
+                    itemStyle: { color: '#22C55E' },
+                    label: { show: true, position: 'bottom', color: '#22C55E', fontSize: 10, fontWeight: 600,
+                             formatter: p => p.name },
+                    z: 10,
                 }] : []),
             ],
         };

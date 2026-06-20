@@ -4,8 +4,6 @@
 (function () {
     'use strict';
 
-    console.log('[analyze] 模块加载 v2');
-
     let chartInstance = null;
 
     async function render(container) {
@@ -232,9 +230,7 @@
             btn.innerHTML = `${Loader({ size: 18 })} 回测中...`;
             showLoading('正在运行回测...');
 
-            console.log('[analyze] 开始回测...', params.symbol, params.strategy);
             const data = await safeAsync(() => API.analyze(params), '回测失败');
-            console.log('[analyze] 回测结果:', data ? 'success' : 'failed', 'equity_curve长度:', data?.equity_curve?.length || 0);
 
             // 获取日线价格数据用于叠加股价折线（回测完成后获取，确保时间范围一致）
             let bars = [];
@@ -256,7 +252,6 @@
     }
 
     function renderResults(data, bars = []) {
-        console.log('[analyze] renderResults 调用, bars长度:', bars.length);
         const _ = window.Icon || {};
         const TrendingUp = _.trendingUp || (() => '');
         const TrendingDown = _.trendingDown || (() => '');
@@ -432,7 +427,6 @@
     }
 
     function renderEquityChart(curve, symbol, stockName, initialCapital, bars = [], trades = []) {
-        console.log('[analyze] renderEquityChart 调用, curve长度:', curve.length, 'bars长度:', bars.length, 'trades长度:', trades.length);
         const dom = document.getElementById('analyze-equity-chart');
         if (!dom) return;
 
@@ -458,20 +452,6 @@
         const closes = dates.map(d => closeByDate[d] ?? null);
         const hasClosePrice = closes.some(v => v != null);
 
-        // 诊断日志：排查价格线不显示的原因
-        console.log('[analyze] bars count:', bars.length, 'equity curve points:', dates.length);
-        if (bars.length > 0) {
-            console.log('[analyze] first bar date:', bars[0]?.date, 'close:', bars[0]?.close);
-            console.log('[analyze] first equity date:', dates[0]);
-            console.log('[analyze] hasClosePrice:', hasClosePrice, 'matched closes:', closes.filter(v => v != null).length);
-            if (!hasClosePrice) {
-                console.warn('[analyze] 日期对齐失败！bars日期样本:', bars.slice(0, 3).map(b => b.date),
-                    'equity日期样本:', dates.slice(0, 3));
-            }
-        } else {
-            console.warn('[analyze] bars数据为空，无法叠加股价折线');
-        }
-
         // 构建日期→净值映射，用于买卖点定位
         const equityByDate = Object.create(null);
         dates.forEach((d, i) => { equityByDate[d] = equities[i]; });
@@ -489,9 +469,6 @@
             }
         });
         const hasTradeMarkers = buyPoints.length > 0 || sellPoints.length > 0;
-        console.log('[analyze] 买卖点: 买入', buyPoints.length, '卖出', sellPoints.length);
-        if (buyPoints.length > 0) console.log('[analyze] 首个买入点:', buyPoints[0]);
-        if (sellPoints.length > 0) console.log('[analyze] 首个卖出点:', sellPoints[0]);
 
         // 计算摘要数据
         const finalEquity = equities[equities.length - 1];
@@ -504,7 +481,7 @@
         const option = {
             title: {
                 text: `${symbol}${stockName ? ' ' + stockName : ''} 净值曲线`,
-                subtext: `基准线 = 虚线 · 净值 = 紫色实线 · 股价 = 橙色实线 · 回撤 = 绿色区域` + (bars.length > 0 && !hasClosePrice ? ' ⚠️ 价格数据日期未对齐' : '') + (bars.length === 0 ? ' ℹ️ 未加载价格数据' : ''),
+                subtext: `基准线 = 虚线 · 净值 = 紫色实线 · 股价 = 橙色实线 · 回撤 = 绿色区域`,
                 left: 'center',
                 textStyle: { color: '#E2E8F0', fontSize: 13, fontWeight: 600 },
                 subtextStyle: { color: '#64748B', fontSize: 10 },

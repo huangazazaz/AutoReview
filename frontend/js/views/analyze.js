@@ -483,9 +483,9 @@
             const eq = equityByDate[t.date];
             if (eq == null) return;
             if (t.action === 'BUY') {
-                buyPoints.push({ coord: [t.date, eq], name: 'B', value: t.price });
+                buyPoints.push({ value: [t.date, eq], name: 'B' });
             } else if (t.action === 'SELL') {
-                sellPoints.push({ coord: [t.date, eq], name: 'S', value: t.price });
+                sellPoints.push({ value: [t.date, eq], name: 'S' });
             }
         });
         const hasTradeMarkers = buyPoints.length > 0 || sellPoints.length > 0;

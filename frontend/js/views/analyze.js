@@ -426,7 +426,7 @@
         }
     }
 
-    function renderEquityChart(curve, symbol, stockName, initialCapital) {
+    function renderEquityChart(curve, symbol, stockName, initialCapital, bars = []) {
         const dom = document.getElementById('analyze-equity-chart');
         if (!dom) return;
 
@@ -444,6 +444,13 @@
 
         const baseline = new Array(dates.length).fill(initialCapital);
 
+        // 提取收盘价（与净值曲线日期对齐）
+        const closes = dates.map((d, i) => {
+            if (i < bars.length) return bars[i].close;
+            return null;
+        });
+        const hasClosePrice = closes.some(v => v != null);
+
         // 计算摘要数据
         const finalEquity = equities[equities.length - 1];
         const totalReturn = initialCapital > 0 ? ((finalEquity - initialCapital) / initialCapital * 100) : 0;
@@ -455,7 +462,7 @@
         const option = {
             title: {
                 text: `${symbol}${stockName ? ' ' + stockName : ''} 净值曲线`,
-                subtext: `基准线 = 虚线 · 净值 = 紫色实线 · 回撤 = 绿色区域`,
+                subtext: `基准线 = 虚线 · 净值 = 紫色实线 · 股价 = 橙色实线 · 回撤 = 绿色区域`,
                 left: 'center',
                 textStyle: { color: '#E2E8F0', fontSize: 13, fontWeight: 600 },
                 subtextStyle: { color: '#64748B', fontSize: 10 },
@@ -463,7 +470,7 @@
             backgroundColor: '#1E293B',
             // 图例（色盲友好：每条线都有文字标签）
             legend: {
-                data: ['基准', '净值', '回撤'],
+                data: ['基准', '净值', '回撤', ...(hasClosePrice ? ['收盘价'] : [])],
                 bottom: 0,
                 textStyle: { color: '#94A3B8', fontSize: 11 },
             },
@@ -482,12 +489,18 @@
                     const dd = drawdowns[params[0].dataIndex];
                     const ddColor = dd === 0 ? '#94A3B8' : '#22C55E';
                     html += `📉 回撤: <span style="color:${ddColor};font-weight:600;">${dd.toFixed(2)}%</span>`;
+                    if (hasClosePrice) {
+                        const closeVal = closes[params[0].dataIndex];
+                        if (closeVal != null) {
+                            html += `<br/>📊 收盘价: <span style="color:#F59E0B;font-weight:600;">${closeVal.toFixed(2)}</span>`;
+                        }
+                    }
                     return html;
                 },
             },
             grid: [
-                { left: '8%', right: '5%', top: '18%', height: '50%', bottom: '10%' },
-                { left: '8%', right: '5%', top: '73%', height: '15%', bottom: '10%' },
+                { left: '8%', right: '8%', top: '18%', height: '50%', bottom: '10%' },
+                { left: '8%', right: '8%', top: '73%', height: '15%', bottom: '10%' },
             ],
             xAxis: [
                 {
@@ -533,6 +546,19 @@
                     },
                     name: '回撤 (%)',
                     nameTextStyle: { color: '#64748B', fontSize: 10 },
+                },
+                {
+                    type: 'value',
+                    gridIndex: 0,
+                    scale: true,
+                    splitLine: { show: false },
+                    axisLabel: {
+                        color: '#F59E0B',
+                        fontSize: 10,
+                        formatter: v => v.toFixed(2),
+                    },
+                    name: '股价 (元)',
+                    nameTextStyle: { color: '#F59E0B', fontSize: 10 },
                 },
             ],
             series: [
@@ -597,6 +623,17 @@
                     },
                     z: 1,
                 },
+                ...(hasClosePrice ? [{
+                    name: '收盘价',
+                    type: 'line',
+                    data: closes,
+                    xAxisIndex: 0,
+                    yAxisIndex: 2,
+                    lineStyle: { color: '#F59E0B', type: 'solid', width: 1.5 },
+                    itemStyle: { color: '#F59E0B' },
+                    symbol: 'none',
+                    z: 1,
+                }] : []),
             ],
         };
 
@@ -604,7 +641,10 @@
 
         // 屏幕阅读器摘要
         const srSummaryId = 'analyze-equity-summary';
-        const srSummary = `${symbol}${stockName ? ' ' + stockName : ''} 净值曲线图：初始资金${formatAmount(initialCapital)}，最终净值${formatAmount(finalEquity)}，总收益率${formatPct(totalReturn)}，最大回撤${formatPct(maxDD)}，期间最高净值${formatAmount(maxEquity)}。`;
+        const closeStart = hasClosePrice && closes[0] != null ? closes[0].toFixed(2) : '';
+        const closeEnd = hasClosePrice && closes[closes.length - 1] != null ? closes[closes.length - 1].toFixed(2) : '';
+        const closeInfo = hasClosePrice ? `，股价从${closeStart}到${closeEnd}` : '';
+        const srSummary = `${symbol}${stockName ? ' ' + stockName : ''} 净值曲线图：初始资金${formatAmount(initialCapital)}，最终净值${formatAmount(finalEquity)}，总收益率${formatPct(totalReturn)}，最大回撤${formatPct(maxDD)}，期间最高净值${formatAmount(maxEquity)}${closeInfo}。`;
 
         dom.setAttribute('aria-describedby', srSummaryId);
         let srEl = document.getElementById(srSummaryId);

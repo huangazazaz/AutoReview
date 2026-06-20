@@ -50,17 +50,19 @@ def cli(verbose: bool):
 @click.option("--strategy", "strategy_name", required=True, help="策略名")
 @click.option("--start", default=None, help="开始日期 (YYYY-MM-DD)")
 @click.option("--end", default=None, help="结束日期 (YYYY-MM-DD)")
+@click.option("--period", "-p", default=None, help="快捷周期: 1y/6m/20d/60t (默认1y)")
 @click.option("--datasource", default=None, help="数据源 (默认 akshare)")
 @click.option("--reporters", default="console", help="报告输出方式，逗号分隔")
 def analyze(symbol: str, strategy_name: str, start: Optional[str],
-            end: Optional[str], datasource: Optional[str],
-            reporters: str):
+            end: Optional[str], period: Optional[str],
+            datasource: Optional[str], reporters: str):
     """分析单只股票（含回测）。"""
     _run_and_report(
         strategy_name=strategy_name,
         symbols=symbol,
         start=start,
         end=end,
+        period=period,
         datasource=datasource,
         reporters=reporters,
     )
@@ -68,22 +70,31 @@ def analyze(symbol: str, strategy_name: str, start: Optional[str],
 
 @cli.command()
 @click.option("--strategy", "strategy_name", required=True, help="策略名")
-@click.option("--symbols", required=True, help="股票代码列表，逗号分隔")
+@click.option("--symbols", default=None, help="股票代码列表，逗号分隔")
+@click.option("--group", default=None, help="股票分组名 (config/groups/<name>.yaml)")
 @click.option("--start", default=None, help="开始日期 (YYYY-MM-DD)")
 @click.option("--end", default=None, help="结束日期 (YYYY-MM-DD)")
+@click.option("--period", "-p", default=None, help="快捷周期: 1y/6m/20d/60t (默认1y)")
 @click.option("--datasource", default=None, help="数据源 (默认 akshare)")
 @click.option("--reporters", default="console", help="报告输出方式，逗号分隔")
-def backtest(strategy_name: str, symbols: str, start: Optional[str],
-             end: Optional[str], datasource: Optional[str],
-             reporters: str):
-    """批量回测多只股票。"""
+def backtest(strategy_name: str, symbols: Optional[str], group: Optional[str],
+             start: Optional[str], end: Optional[str], period: Optional[str],
+             datasource: Optional[str], reporters: str):
+    """批量回测多只股票。--symbols 或 --group 至少指定一个。"""
+    resolved = _resolve_input(symbols, group)
+    if not resolved:
+        click.echo("请用 --symbols 或 --group 指定股票", err=True)
+        return
+    names = _load_group_names(group) if group else None
     _run_and_report(
         strategy_name=strategy_name,
-        symbols=symbols,
+        symbols=resolved,
         start=start,
         end=end,
+        period=period,
         datasource=datasource,
         reporters=reporters,
+        stock_names=names,
     )
 
 
@@ -148,6 +159,25 @@ def list_plugins(component: str):
         click.echo("  (空)")
 
 
+@cli.command(name="list-groups")
+def list_groups():
+    """列出股票分组。"""
+    groups_dir = Path(__file__).resolve().parent.parent.parent / "config" / "groups"
+    if not groups_dir.exists():
+        click.echo("(无分组)")
+        return
+    files = sorted(groups_dir.glob("*.yaml"))
+    if not files:
+        click.echo("(无分组)")
+        return
+    click.echo(f"\n可用分组 ({len(files)}):")
+    for f in files:
+        cfg = _load_yaml(f)
+        name = cfg.get("name", f.stem)
+        symbols = _extract_symbols(cfg)
+        click.echo(f"  • {f.stem}  ({name}): {', '.join(f'{c}({n})' for c, n in symbols[:5])}{'...' if len(symbols) > 5 else ''}")
+
+
 @cli.command()
 @click.option("--result", required=True, help="结果文件路径 (.json)")
 def show(result: str):
@@ -172,14 +202,116 @@ def _parse_date(date_str: Optional[str]) -> Optional[date]:
     return date.fromisoformat(date_str)
 
 
+def _parse_period(period: Optional[str]) -> tuple[Optional[date], Optional[date]]:
+    """解析周期快捷参数，返回 (start, end)。
+
+    支持: 1y(年) 6m(月) 20d(日历日) 60t(交易日, 近似日历日×1.4)
+    默认: 1y
+    """
+    if not period:
+        period = "1y"
+
+    import re
+    m = re.match(r"^(\d+)\s*([ymdt])$", period.lower().strip())
+    if not m:
+        return None, None
+
+    num = int(m.group(1))
+    unit = m.group(2)
+    today = date.today()
+
+    if unit == "y":
+        start = date(today.year - num, today.month, today.day)
+    elif unit == "m":
+        total_months = today.month - 1 - num
+        y = today.year + total_months // 12
+        m = total_months % 12 + 1
+        start = date(y, m, min(today.day, 28))
+    else:
+        # d(日历日) / t(交易日, 近似日历日×1.4)
+        from datetime import timedelta
+        days = int(num * 1.4) if unit == "t" else num
+        start = today - timedelta(days=days)
+
+    return start, today
+
+
+def _resolve_input(symbols: Optional[str], group: Optional[str]) -> Optional[str]:
+    """解析 --symbols 或 --group，返回逗号分隔的代码字符串。"""
+    if symbols:
+        return symbols
+    if group:
+        return _load_group_symbols(group)
+    return None
+
+
+def _load_group_symbols(name: str) -> Optional[str]:
+    """从 config/groups/<name>.yaml 加载股票列表（返回逗号分隔代码）。"""
+    groups_dir = Path(__file__).resolve().parent.parent.parent / "config" / "groups"
+    path = groups_dir / f"{name}.yaml"
+    if not path.exists():
+        click.echo(f"分组不存在: {name} (文件: {path})", err=True)
+        return None
+    cfg = _load_yaml(path)
+    syms = _extract_symbols(cfg)
+    if not syms:
+        click.echo(f"分组 {name} 没有配置股票", err=True)
+        return None
+    return ",".join(c for c, _ in syms)
+
+
+def _extract_symbols(cfg: dict) -> list[tuple[str, str]]:
+    """从分组配置提取 [(code, name), ...]。
+
+    支持两种格式:
+      symbols: ["600522", "000001"]              → name 为空
+      symbols: {"600522": "中天科技", ...}       → code→name 映射
+    """
+    raw = cfg.get("symbols", [])
+    if isinstance(raw, dict):
+        return [(str(k), str(v)) for k, v in raw.items()]
+    if isinstance(raw, list):
+        return [(str(s), "") for s in raw]
+    return []
+
+
+def _load_group_names(name: str) -> dict[str, str]:
+    """加载分组的代码→名称映射。"""
+    groups_dir = Path(__file__).resolve().parent.parent.parent / "config" / "groups"
+    path = groups_dir / f"{name}.yaml"
+    if not path.exists():
+        return {}
+    cfg = _load_yaml(path)
+    syms = _extract_symbols(cfg)
+    return {code: sname for code, sname in syms if sname}
+
+
+def _load_yaml(path: Path) -> dict:
+    """加载 YAML 文件。"""
+    import yaml
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
 def _run_and_report(strategy_name: str, symbols: str,
                     start: Optional[str], end: Optional[str],
-                    datasource: Optional[str],
-                    reporters: str = "console") -> dict:
+                    period: Optional[str] = None,
+                    datasource: Optional[str] = None,
+                    reporters: str = "console",
+                    stock_names: dict[str, str] | None = None) -> dict:
     """统一执行入口。"""
     config = load_config()
-    ds = datasource or config.get("datasource", {}).get("default", "akshare")
+    ds = datasource or config.get("datasource", {}).get("default", "failover")
     reporter_list = [r.strip() for r in reporters.split(",") if r.strip()]
+
+    # 日期：显式 start/end 优先 → period → 默认 1y
+    p_start = _parse_date(start)
+    p_end = _parse_date(end)
+    if p_start is None and p_end is None:
+        if period or not (start or end):
+            p_start, p_end = _parse_period(period or "1y")
 
     # 加载策略参数
     strategy_params = get_strategy_params(strategy_name)
@@ -187,11 +319,12 @@ def _run_and_report(strategy_name: str, symbols: str,
     summary = run_backtest(
         strategy_name=strategy_name,
         symbols=symbols,
-        start=_parse_date(start),
-        end=_parse_date(end),
+        start=p_start,
+        end=p_end,
         datasource_name=ds,
         reporter_names=tuple(reporter_list),
         strategy_params=strategy_params.get("params") if strategy_params else None,
+        stock_names=stock_names,
     )
 
     # 输出汇总

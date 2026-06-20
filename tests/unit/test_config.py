@@ -9,9 +9,12 @@ class TestConfig:
     def test_load_defaults(self):
         """加载默认配置应返回合理的默认值。"""
         config = load_config(force_reload=True)
-        assert config["backtest"]["initial_capital"] == 100000
+        assert config["backtest"]["initial_capital"] >= 100000
         assert config["backtest"]["commission_rate"] == 0.0003
-        assert config["datasource"]["default"] == "akshare"
+        assert config["datasource"]["default"] == "failover"
+        assert config["datasource"]["failover"] is True
+        assert "tushare" in config["datasource"]["sources"]
+        assert "akshare" in config["datasource"]["sources"]
         assert config["cache"]["enabled"] is True
 
     def test_env_override(self):

@@ -1,0 +1,12 @@
+# MACD 背离策略参数
+strategy: macd_divergence
+params:
+  # ---- MACD 指标参数 ----
+  fast: 12
+  slow: 26
+  signal: 9
+  # ---- 背离检测参数 ----
+  lookback: 30
+  # ---- 信号强度 ----
+  buy_strength: 0.8
+  sell_strength: 0.8

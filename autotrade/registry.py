@@ -50,6 +50,10 @@ def _discover_plugins(package_name: str, base_class: type,
                     key = instance.name if hasattr(instance, 'name') else name.lower()
                 except Exception:
                     key = name.lower()
+                # 跳过内部包装器类（如 FailoverDataSource 的 name="_failover"），
+                # 避免被当成普通插件注册而被 --datasource 误选。
+                if isinstance(key, str) and key.startswith("_"):
+                    continue
                 registry[key] = obj
 
 

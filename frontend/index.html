@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoTrade — A股量化回测系统</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F59E0B' stroke-width='2'><polyline points='22 7 13.5 15.5 8.5 10.5 2 17'/><polyline points='16 7 22 7 22 13'/></svg>">
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- ECharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+</head>
+<body>
+    <!-- 跳过导航（无障碍） -->
+    <a class="skip-link" href="#view-container">跳过导航，直达内容</a>
+
+    <!-- 侧边栏 -->
+    <aside class="sidebar" id="sidebar" aria-label="侧边导航">
+        <div class="sidebar-brand">
+            <span class="brand-icon"><svg class="icon brand-logo" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="AutoTrade"><rect x="2" y="4" width="20" height="16" rx="3" fill="currentColor" fill-opacity="0.12"/><polyline points="7 17 10 10 13 14 16 7 18 11"/><circle cx="7" cy="17" r="1" fill="currentColor" fill-opacity="0.5"/><circle cx="18" cy="11" r="1" fill="currentColor" fill-opacity="0.5"/></svg></span>
+            <span class="brand-text">AutoTrade</span>
+        </div>
+        <nav class="sidebar-nav" aria-label="主导航">
+            <a href="#/" class="nav-item active" data-route="/" role="link" aria-current="page">
+                <span class="nav-icon"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span>
+                <span class="nav-label">仪表盘</span>
+            </a>
+            <a href="#/analyze" class="nav-item" data-route="/analyze">
+                <span class="nav-icon"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                <span class="nav-label">单股分析</span>
+            </a>
+            <a href="#/backtest" class="nav-item" data-route="/backtest">
+                <span class="nav-icon"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <span class="nav-label">批量回测</span>
+            </a>
+            <a href="#/bars" class="nav-item" data-route="/bars">
+                <span class="nav-icon"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="4" width="4" height="7" rx="0.5"/><line x1="8" y1="3" x2="8" y2="4"/><line x1="8" y1="11" x2="8" y2="13"/><rect x="14" y="9" width="4" height="6" rx="0.5"/><line x1="16" y1="7" x2="16" y2="9"/><line x1="16" y1="15" x2="16" y2="18"/></svg></span>
+                <span class="nav-label">K线数据</span>
+            </a>
+            <a href="#/groups" class="nav-item" data-route="/groups">
+                <span class="nav-icon"><svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.89l-.82-1.22A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg></span>
+                <span class="nav-label">分组管理</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <span class="version">v0.1.0</span>
+        </div>
+    </aside>
+
+    <!-- 移动端菜单按钮 -->
+    <button class="menu-toggle" id="menu-toggle" aria-label="打开菜单" aria-expanded="false" aria-controls="sidebar">
+        <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+    </button>
+
+    <!-- 主内容区 -->
+    <main class="main-content" id="view-container" tabindex="-1">
+        <!-- 视图由 JS 动态渲染 -->
+    </main>
+
+    <!-- 全局加载遮罩 -->
+    <div class="loading-overlay" id="loading-overlay" style="display:none;" role="alert" aria-busy="true" aria-label="加载中">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>加载中...</p>
+    </div>
+
+    <!-- 全局 Toast 容器 -->
+    <div class="toast-container" id="toast-container" role="status" aria-live="polite" aria-atomic="false"></div>
+
+    <!-- JS 模块 -->
+    <script src="/js/icons.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/router.js"></script>
+    <script src="/js/views/dashboard.js"></script>
+    <script src="/js/views/analyze.js"></script>
+    <script src="/js/views/backtest.js"></script>
+    <script src="/js/views/bars.js"></script>
+    <script src="/js/views/groups.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

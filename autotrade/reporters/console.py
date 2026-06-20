@@ -19,7 +19,10 @@ class ConsoleReporter(Reporter):
         console = Console()
 
         # 标题
-        console.print(Panel.fit(f"[bold]回测结果: {result.symbol}", border_style="blue"))
+        title = result.symbol
+        if result.stock_name:
+            title = f"{result.stock_name} ({result.symbol})"
+        console.print(Panel.fit(f"[bold]回测结果: {title}", border_style="blue"))
 
         # 汇总指标
         if result.metrics:
@@ -37,23 +40,50 @@ class ConsoleReporter(Reporter):
 
         # 交易记录
         if result.trades:
+            initial_capital = result.metrics.get("initial_capital", 100000)
             trades_table = Table(title=f"交易记录 ({len(result.trades)} 笔)",
                                  show_header=True, header_style="bold green")
             trades_table.add_column("日期")
             trades_table.add_column("方向")
             trades_table.add_column("价格")
             trades_table.add_column("数量")
-            trades_table.add_column("佣金")
-            trades_table.add_column("印花税")
+            trades_table.add_column("持仓")
+            trades_table.add_column("现金")
+            trades_table.add_column("总资产")
+            trades_table.add_column("原因")
 
+            # 构建日期→信号映射，方便给每笔交易标注原因
+            signal_reasons: dict[str, list[str]] = {}
+            for s in result.signals:
+                key = f"{s.date}_{s.action}"
+                signal_reasons.setdefault(key, []).append(s.reason)
+
+            cash = initial_capital
+            position = 0
             for t in result.trades:
+                if t.action == "BUY":
+                    position += t.quantity
+                    cash -= t.price * t.quantity + t.commission
+                else:
+                    position -= t.quantity
+                    cash += t.price * t.quantity - t.commission - t.stamp_duty
+
+                total_equity = cash + position * t.price
+
+                # 匹配信号原因
+                key = f"{t.date}_{t.action}"
+                reasons = signal_reasons.get(key, [])
+                reason_str = reasons.pop(0) if reasons else "-"
+
                 trades_table.add_row(
                     str(t.date),
                     t.action,
                     f"{t.price:.2f}",
                     str(t.quantity),
-                    f"{t.commission:.2f}",
-                    f"{t.stamp_duty:.2f}" if t.stamp_duty else "-",
+                    str(position),
+                    f"{cash:,.0f}",
+                    f"{total_equity:,.0f}",
+                    reason_str,
                 )
 
             console.print(trades_table)

@@ -20,7 +20,20 @@ _DEFAULT_CONFIG_PATH: Path = _CONFIG_DIR / "settings.yaml"
 # 默认配置（硬编码 fallback）
 _DEFAULT_SETTINGS: dict[str, Any] = {
     "datasource": {
-        "default": "akshare",
+        "default": "failover",  # 默认走主备降级；可显式设为 "akshare"/"tushare"
+        "failover": True,       # 降级总开关
+        "sources": {
+            "tushare": {
+                "enabled": True,   # 主力（需配 token，无 token 自动禁用）
+                "priority": 1,
+                "token": "",
+            },
+            "akshare": {
+                "enabled": True,   # 备用
+                "priority": 2,
+            },
+        },
+        # 向后兼容：保留顶层 tushare.token（旧配置仍可工作）
         "tushare": {"token": ""},
     },
     "cache": {
@@ -142,6 +155,12 @@ def get_backtest_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
     """从配置中提取回测子配置。"""
     cfg = config or load_config()
     return cfg.get("backtest", {})
+
+
+def get_datasource_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """从配置中提取数据源子配置。"""
+    cfg = config or load_config()
+    return cfg.get("datasource", {})
 
 
 def get_strategy_params(strategy_name: str) -> dict[str, Any]:

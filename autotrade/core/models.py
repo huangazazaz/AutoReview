@@ -82,6 +82,7 @@ class BacktestResult:
     equity_curve: Optional[pd.Series] = None  # 净值曲线（按日期）
     metrics: dict = field(default_factory=dict)  # 收益率/胜率/最大回撤/夏普等
     signals: list[Signal] = field(default_factory=list)  # 产生的所有信号
+    stock_name: str = ""  # 股票名称（可选）
 
     def __post_init__(self):
         if self.metrics is None:

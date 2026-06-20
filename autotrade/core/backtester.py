@@ -206,6 +206,38 @@ class Backtester:
         quantity = (quantity // self.config.lot_size) * self.config.lot_size
         return max(0, quantity)
 
+    @staticmethod
+    def _split_cycles(trades: list) -> list[tuple[list, list]]:
+        """将交易列表按持仓周期拆分。每轮从空仓到再次空仓为一个周期。
+
+        Returns:
+            [(buys, sells), ...]  最后一个周期可能只有 buys（未平仓）。
+        """
+        cycles: list[tuple[list, list]] = []
+        current_buys: list = []
+        current_sells: list = []
+        position = 0
+
+        for t in trades:
+            if t.action == "BUY":
+                current_buys.append(t)
+                position += t.quantity
+            else:
+                current_sells.append(t)
+                position -= t.quantity
+
+            if position == 0 and current_buys:
+                cycles.append((current_buys, current_sells))
+                current_buys = []
+                current_sells = []
+
+        # 未平仓周期
+        if current_buys:
+            cycles.append((current_buys, current_sells))
+
+        return cycles
+
+
     def _compute_metrics(self, trades: list[Trade],
                          equity_series: list[float],
                          dates: list[date]) -> dict:
@@ -223,24 +255,32 @@ class Backtester:
         final_equity = equity_series[-1]
         total_return_pct = (final_equity - initial_capital) / initial_capital * 100
 
-        # 胜率：按买卖配对计算
+        # 胜率：按持仓周期计算（一轮完整建仓→清仓为一个周期）
+        # 用加权均价对比：加权卖出均价 > 加权买入均价 → 赢
         buy_trades = [t for t in trades if t.action == "BUY"]
         sell_trades = [t for t in trades if t.action == "SELL"]
-        # 简化：按顺序配对
         wins = 0
-        total_pairs = min(len(buy_trades), len(sell_trades))
-        for i in range(total_pairs):
-            buy = buy_trades[i]
-            sell = sell_trades[i]
-            if sell.price > buy.price:
-                wins += 1
-        win_rate = (wins / total_pairs * 100) if total_pairs > 0 else 0.0
+        cycles = self._split_cycles(trades)
+        for buys, sells in cycles:
+            if not sells:
+                continue  # 未平仓周期不参与胜率
+            total_buy_amount = sum(b.price * b.quantity for b in buys)
+            total_buy_qty = sum(b.quantity for b in buys)
+            total_sell_amount = sum(s.price * s.quantity for s in sells)
+            total_sell_qty = sum(s.quantity for s in sells)
+            if total_buy_qty > 0 and total_sell_qty > 0:
+                avg_buy = total_buy_amount / total_buy_qty
+                avg_sell = total_sell_amount / total_sell_qty
+                if avg_sell > avg_buy:
+                    wins += 1
+        total_cycles = len(cycles) - (1 if cycles and not cycles[-1][1] else 0)
+        win_rate = (wins / total_cycles * 100) if total_cycles > 0 else 0.0
 
         # 最大回撤
         equity_arr = np.array(equity_series)
         peak = np.maximum.accumulate(equity_arr)
         drawdown = (peak - equity_arr) / peak * 100
-        max_drawdown_pct = float(np.max(drawdown))
+        max_drawdown_pct = -float(np.max(drawdown))  # 负数表示亏损
 
         # 夏普比率（简化：用日收益率，无风险利率=0）
         if len(equity_series) > 1:

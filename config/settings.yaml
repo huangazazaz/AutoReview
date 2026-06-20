@@ -1,15 +1,24 @@
 # AutoTrade 全局配置文件
 datasource:
-  default: akshare
+  default: failover # 默认走主备降级；可显式设为 akshare / tushare
+  failover: true # 降级总开关
+  sources:
+    tushare:
+      enabled: true # 主力（需配 token，无 token 自动禁用）
+      priority: 1
+      token: "6ad13c8f0284451ab2a9fbe4e2dc9cfe81ce6cc594c11cc1216c192d" # 填入 Tushare token，或用环境变量 AUTOTRADE__DATASOURCE__SOURCES__TUSHARE__TOKEN
+    akshare:
+      enabled: true # 备用
+      priority: 2
   tushare:
-    token: ""  # 使用 Tushare 时在此填入 token
+    token: "" # 旧字段保留兼容（推荐用上面的 sources.tushare.token）
 
 cache:
   enabled: true
   dir: data/cache
 
 backtest:
-  initial_capital: 100000
+  initial_capital: 1000000
   fill_price: next_open
   commission_rate: 0.0003
   stamp_duty_rate: 0.001

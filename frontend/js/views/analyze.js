@@ -444,11 +444,12 @@
 
         const baseline = new Array(dates.length).fill(initialCapital);
 
-        // 提取收盘价（与净值曲线日期对齐）
-        const closes = dates.map((d, i) => {
-            if (i < bars.length) return bars[i].close;
-            return null;
-        });
+        // 提取收盘价（按日期对齐，避免索引偏移）
+        const closeByDate = Object.create(null);
+        for (const bar of bars) {
+            if (bar.close != null) closeByDate[bar.date] = bar.close;
+        }
+        const closes = dates.map(d => closeByDate[d] ?? null);
         const hasClosePrice = closes.some(v => v != null);
 
         // 计算摘要数据
@@ -643,7 +644,10 @@
         const srSummaryId = 'analyze-equity-summary';
         const closeStart = hasClosePrice && closes[0] != null ? closes[0].toFixed(2) : '';
         const closeEnd = hasClosePrice && closes[closes.length - 1] != null ? closes[closes.length - 1].toFixed(2) : '';
-        const closeInfo = hasClosePrice ? `，股价从${closeStart}到${closeEnd}` : '';
+        const nonNullCloses = closes.filter(v => v != null);
+        const closeInfo = nonNullCloses.length > 0
+            ? `，股价从${nonNullCloses[0].toFixed(2)}到${nonNullCloses[nonNullCloses.length - 1].toFixed(2)}`
+            : '';
         const srSummary = `${symbol}${stockName ? ' ' + stockName : ''} 净值曲线图：初始资金${formatAmount(initialCapital)}，最终净值${formatAmount(finalEquity)}，总收益率${formatPct(totalReturn)}，最大回撤${formatPct(maxDD)}，期间最高净值${formatAmount(maxEquity)}${closeInfo}。`;
 
         dom.setAttribute('aria-describedby', srSummaryId);

@@ -71,7 +71,8 @@ def test_prefilter_rejects_low_amount():
 
 def test_prefilter_rejects_out_of_momentum_range():
     """近1月涨跌幅不在区间内被剔除。"""
-    closes = np.linspace(10, 25, 80).tolist()
+    # 前60天横盘10元，后20天暴涨到16元 → 1月涨幅约60%，超过40%上限
+    closes = [10.0] * 60 + [16.0] * 20
     df = _make_df(closes)
     d = df.index[-1].date()
     result = _run_scan({"test": df}, [d], mom_1m_min=0.03, mom_1m_max=0.40)
@@ -199,7 +200,8 @@ def test_consistency_scoring():
 
 def test_signal_tag_strong():
     """强势标签：mom_1m 高 + mom_5d 为正 → momentum_strong。"""
-    closes = np.linspace(10, 18, 100).tolist()
+    # 持续上涨，20日涨幅~25%，5日涨幅~5%
+    closes = np.linspace(10, 20, 100).tolist()
     vols = [2e7] * 100
     df = _make_df(closes, vols)
     d = df.index[-1].date()
@@ -213,8 +215,10 @@ def test_signal_tag_strong():
 
 def test_signal_tag_pullback():
     """回调标签：mom_1m 中等 + mom_5d 为负 → momentum_pullback。"""
-    closes = np.linspace(10, 16, 70).tolist() + [16.0, 15.7, 15.4, 15.2, 15.1]
-    vols = [2e7] * 75
+    # 前50天横盘，然后45天急涨 10→22，最后5天回调
+    n = 100
+    closes = [10.0] * 50 + np.linspace(10, 22, 45).tolist() + [22.0, 21.5, 21.0, 20.6, 20.3]
+    vols = [2e7] * n
     df = _make_df(closes, vols)
     d = df.index[-1].date()
     screener = MomentumScreener(min_amount=1_000_000, mom_1m_min=-1.0, mom_1m_max=10.0,

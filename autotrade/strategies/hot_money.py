@@ -76,14 +76,14 @@ class HotMoneyStrategy(Strategy):
             mf = float(ma_fast.iloc[idx])
             mm = float(ma_mid.iloc[idx])
 
-            # ---- 空仓: 检查是否在允许进场日 ----
+            # ---- 空仓: 确认进场 ----
             if not in_position:
                 if today in self.allowed_entry_dates:
-                    # 进场确认: 当日必须收阳
+                    # 1. 当日必须收阳
                     o_today = float(df["open"].iloc[idx])
                     if current_close <= o_today:
-                        continue  # 不收阳则跳过
-                    # 如有前日数据, 还需高于前收（排除假突破）
+                        continue
+                    # 2. 必须高于前收（排除继续下跌）
                     if idx >= 1:
                         prev_close = float(close_series.iloc[idx - 1])
                         if current_close <= prev_close:

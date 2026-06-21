@@ -76,8 +76,9 @@ class HotMoneyScreener(Screener):
         self.strength_gain_min = strength_gain_min
         self.strength_vol_ratio = strength_vol_ratio
         self.exclude_min_history_days = exclude_min_history_days
+        self.ma_slope_days = 5                     # MA 斜率检查天数
+        self.market_breadth_min = 0.0              # 暂关闭，市场震荡期不宜用
         self.name = "hot_money_screener"
-        self.required_indicators = []
 
     # ------------------------------------------------------------------
     def scan(
@@ -118,6 +119,26 @@ class HotMoneyScreener(Screener):
             if not passing:
                 result[scan_date] = []
                 continue
+
+            # ---- 市场广度: 多头比例不足则空仓 ----
+            if self.market_breadth_min > 0:
+                # 统计全市场 MA20 > MA60 的比例
+                bull_count = 0
+                total_checked = 0
+                for sym, df in market_data.items():
+                    if "_ma_fast" not in df.columns:
+                        continue
+                    i = self._index_of(df, scan_date)
+                    if i is None:
+                        continue
+                    mf = float(df["_ma_fast"].iloc[i])
+                    mm = float(df["_ma_mid"].iloc[i])
+                    if not pd.isna(mf) and not pd.isna(mm) and mf > mm:
+                        bull_count += 1
+                    total_checked += 1
+                if total_checked > 0 and bull_count / total_checked < self.market_breadth_min:
+                    result[scan_date] = []
+                    continue
 
             # ---- 第二遍：信号评估 ----
             candidates: list[tuple[str, float, str]] = []
@@ -188,7 +209,7 @@ class HotMoneyScreener(Screener):
         if abs(h - l) < 1e-6:
             return False
 
-        # 趋势: MA20 > MA60 > MA120
+        # 趋势: MA20 > MA60 > MA120，且 MA20 斜率向上
         ma_f = float(df["_ma_fast"].iloc[idx])
         ma_m = float(df["_ma_mid"].iloc[idx])
         ma_s = float(df["_ma_slow"].iloc[idx])
@@ -196,6 +217,12 @@ class HotMoneyScreener(Screener):
             return False
         if not (ma_f > ma_m > ma_s):
             return False
+        # MA20 斜率: 今天 > N 天前
+        # （暂放宽：只要求 MA20 > MA60 > MA120 即可，斜率检查过于严格）
+        # slope_idx = max(0, idx - self.ma_slope_days)
+        # ma_f_past = float(df["_ma_fast"].iloc[slope_idx])
+        # if pd.isna(ma_f_past) or ma_f <= ma_f_past:
+        #     return False
 
         # 流动性: 日均成交额
         amt_ma = float(df["_amount_ma"].iloc[idx])

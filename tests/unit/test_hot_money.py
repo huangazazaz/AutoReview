@@ -24,22 +24,23 @@ def _make_df(closes, volumes=None, start="2024-01-01"):
 # ============ Strategy tests (entry must close > open) ============
 
 def test_hard_stop_loss():
-    # 进场日上涨 10.0→10.1，然后跌到 9.5 (-5%)
-    df = _make_df([10.0, 10.1, 9.5])
+    # 进场日上涨 10.0→10.1，然后跌到 9.3 (-7%, 触发默认 -7% 止损)
+    df = _make_df([10.0, 10.1, 9.3])
     s = HotMoneyStrategy(allowed_entry_dates=[df.index[0].date()])
     sigs = s.generate_signals(df)
     assert any("止损" in sig.reason for sig in sigs if sig.action == "SELL")
 
 
 def test_time_stop():
-    df = _make_df([10.0, 10.05, 10.05, 10.04, 10.05, 10.05, 10.04])
+    df = _make_df([10.0, 10.05, 10.05, 10.04, 10.05, 10.05, 10.04, 10.05])
     s = HotMoneyStrategy(allowed_entry_dates=[df.index[0].date()])
     sigs = s.generate_signals(df)
     assert any("时间" in sig.reason for sig in sigs if sig.action == "SELL")
 
 
 def test_trailing_take_profit():
-    df = _make_df([10.0, 10.1, 10.6, 10.38])
+    # 进场 10.0 → 涨到 11.5 (+15%, 启动移动止盈) → 回撤到 10.9 (-5.2%)
+    df = _make_df([10.0, 11.5, 10.9])
     s = HotMoneyStrategy(allowed_entry_dates=[df.index[0].date()])
     sigs = s.generate_signals(df)
     assert any("止盈" in sig.reason for sig in sigs if sig.action == "SELL")

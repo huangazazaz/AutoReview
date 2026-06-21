@@ -31,15 +31,17 @@ class HotMoneyStrategy(Strategy):
     def __init__(
         self,
         allowed_entry_dates: list[date] | None = None,
-        trailing_activate: float = 0.05,
-        trailing_drawdown: float = 0.02,
-        time_stop_days: int = 5,
-        time_stop_min_gain: float = 0.03,
-        stop_loss: float = 0.05,
+        use_screener: bool = True,               # False=独立模式, 自行判断进场
+        trailing_activate: float = 0.12,
+        trailing_drawdown: float = 0.05,
+        time_stop_days: int = 7,
+        time_stop_min_gain: float = 0.05,
+        stop_loss: float = 0.07,
         trend_ma_fast: int = 20,
         trend_ma_mid: int = 60,
     ):
         self.allowed_entry_dates = set(allowed_entry_dates or [])
+        self.use_screener = use_screener and bool(self.allowed_entry_dates)
         self.trailing_activate = trailing_activate
         self.trailing_drawdown = trailing_drawdown
         self.time_stop_days = time_stop_days
@@ -78,7 +80,16 @@ class HotMoneyStrategy(Strategy):
 
             # ---- 空仓: 确认进场 ----
             if not in_position:
-                if today in self.allowed_entry_dates:
+                can_enter = False
+                if self.use_screener:
+                    # 模式 A: 由 Screener 指定进场日期
+                    can_enter = today in self.allowed_entry_dates
+                else:
+                    # 模式 B: 独立运行, 自行判断 —— MA20 > MA60 且收阳
+                    can_enter = (
+                        not pd.isna(mf) and not pd.isna(mm) and mf > mm
+                    )
+                if can_enter:
                     # 1. 当日必须收阳
                     o_today = float(df["open"].iloc[idx])
                     if current_close <= o_today:
@@ -111,7 +122,7 @@ class HotMoneyStrategy(Strategy):
                     trailing_active = True
 
                 # 闸门3: 硬止损（最高优先级）
-                if gain <= -self.stop_loss:
+                if gain <= -self.stop_loss + 1e-9:
                     signals.append(Signal(
                         symbol="", date=current_date, action="SELL",
                         strength=1.0, reason=f"硬止损({gain:.1%})",

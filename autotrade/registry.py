@@ -12,13 +12,16 @@ import inspect
 import pkgutil
 from typing import Optional
 
-from autotrade.core.interfaces import DataSource, Indicator, Reporter, Strategy
+from autotrade.core.interfaces import (
+    DataSource, Indicator, Reporter, Screener, Strategy,
+)
 
 # 注册表存储
 _datasources: dict[str, type[DataSource]] = {}
 _indicators: dict[str, type[Indicator]] = {}
 _strategies: dict[str, type[Strategy]] = {}
 _reporters: dict[str, type[Reporter]] = {}
+_screens: dict[str, type[Screener]] = {}
 
 # 初始化标志
 _initialized = False
@@ -69,11 +72,13 @@ def init_registry(force: bool = False) -> None:
     _indicators.clear()
     _strategies.clear()
     _reporters.clear()
+    _screens.clear()
 
     _discover_plugins("autotrade.dataSources", DataSource, _datasources)
     _discover_plugins("autotrade.indicators", Indicator, _indicators)
     _discover_plugins("autotrade.strategies", Strategy, _strategies)
     _discover_plugins("autotrade.reporters", Reporter, _reporters)
+    _discover_plugins("autotrade.screens", Screener, _screens)
 
 
 # --- 注册（手动注册，供插件 __init__ 使用）---
@@ -160,3 +165,25 @@ def get_all_strategies() -> dict[str, type[Strategy]]:
     if not _initialized:
         init_registry()
     return dict(_strategies)
+
+
+# --- Screener 注册与查询 ---
+
+def register_screener(name: str, cls: type[Screener]) -> None:
+    _screens[name] = cls
+
+
+def get_screener(name: str) -> type[Screener]:
+    if not _initialized:
+        init_registry()
+    if name not in _screens:
+        raise KeyError(
+            f"Screener '{name}' not found. Available: {list(_screens)}"
+        )
+    return _screens[name]
+
+
+def list_screens() -> list[str]:
+    if not _initialized:
+        init_registry()
+    return list(_screens)

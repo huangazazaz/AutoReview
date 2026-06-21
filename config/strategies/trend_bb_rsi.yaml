@@ -1,0 +1,25 @@
+# 布林带 + RSI + MACD + 量能 多因子策略参数
+strategy: trend_bb_rsi
+params:
+  # ---- 布林带 ----
+  bb_period: 20
+  bb_std: 2.0
+  # ---- RSI ----
+  rsi_period: 14
+  rsi_buy_low: 30       # RSI 买入下限
+  rsi_buy_high: 55      # RSI 买入上限
+  rsi_sell: 75          # RSI 超买卖出
+  # ---- MACD ----
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  # ---- 量能 ----
+  vol_period: 20
+  vol_factor: 1.2        # 放量倍数（成交量 > 均量 × 1.2）
+  # ---- 风控 ----
+  stop_loss: 0.07        # 硬止损 -7%
+  trailing_stop: 0.10    # 移动止盈回撤 -10%
+  # ---- 阶梯止盈 ----
+  take_profit_levels:
+    - [0.15, 0.4]        # +15% 卖 40%
+    - [0.30, 0.4]        # +30% 卖 40%（剩余由止损/移动止盈清仓）

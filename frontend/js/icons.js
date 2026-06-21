@@ -249,6 +249,38 @@ const Icon = (() => {
         </svg>`;
     }
 
+    /** 日历 (Calendar) */
+    function calendar(opts = {}) {
+        return `<svg ${attrs(opts.size, opts.class, 'aria-label="日历"')}>
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>`;
+    }
+
+    /** 井号 (Hash) — 用于股票代码 */
+    function hash(opts = {}) {
+        return `<svg ${attrs(opts.size, opts.class, 'aria-label="代码"')}>
+            <line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/>
+            <line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>
+        </svg>`;
+    }
+
+    /** 右箭头 (Chevron Right) — 用于日期范围连接 */
+    function chevronRight(opts = {}) {
+        return `<svg ${attrs(opts.size, opts.class, 'aria-label="至"')}>
+            <polyline points="9 18 15 12 9 6"/>
+        </svg>`;
+    }
+
+    /** 时钟 (Clock) — 用于周期选择 */
+    function clock(opts = {}) {
+        return `<svg ${attrs(opts.size, opts.class, 'aria-label="周期"')}>
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+        </svg>`;
+    }
+
     return {
         // 导航
         dashboard, search, chart, candlestick, folder,
@@ -267,6 +299,8 @@ const Icon = (() => {
         // 工具
         externalLink, copy, refresh, loader, menu,
         settings, rocket,
+        // 表单
+        calendar, hash, chevronRight, clock,
     };
 })();
 

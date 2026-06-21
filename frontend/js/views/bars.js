@@ -42,23 +42,24 @@
                         <div class="form-group">
                             <label class="form-label" for="bars-period">周期</label>
                             <select class="form-select" id="bars-period">
+                                <option value="">自定义日期</option>
                                 <option value="1y">最近 1 年</option>
                                 <option value="6m">最近 6 个月</option>
                                 <option value="3m">最近 3 个月</option>
-                                <option value="20d" selected>最近 20 天</option>
+                                <option value="20d">最近 20 天</option>
                                 <option value="60t">最近 60 交易日</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="bars-start">开始日期</label>
                             <input type="text" class="form-input date-input" id="bars-start"
-                                placeholder="开始日期" autocomplete="off"
+                                placeholder="开始日期" value="2025-01-01" autocomplete="off"
                                 onfocus="this.type='date';this.showPicker?.()" onblur="if(!this.value)this.type='text'">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="bars-end">结束日期</label>
                             <input type="text" class="form-input date-input" id="bars-end"
-                                placeholder="结束日期" autocomplete="off"
+                                placeholder="结束日期" value="2026-06-18" autocomplete="off"
                                 onfocus="this.type='date';this.showPicker?.()" onblur="if(!this.value)this.type='text'">
                         </div>
                         <div class="form-group" style="display:flex; align-items:flex-end;">
@@ -102,13 +103,13 @@
             const params = { symbol };
 
             const period = document.getElementById('bars-period').value;
-            const start = document.getElementById('bars-start').value;
-            const end = document.getElementById('bars-end').value;
-            if (start || end) {
+            if (period) {
+                params.period = period;
+            } else {
+                const start = document.getElementById('bars-start').value;
+                const end = document.getElementById('bars-end').value;
                 if (start) params.start = start;
                 if (end) params.end = end;
-            } else {
-                params.period = period;
             }
 
             const btn = document.getElementById('bars-submit');

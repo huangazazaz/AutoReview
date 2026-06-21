@@ -1,28 +1,29 @@
-# 游资选股筛网 — 放量起涨 + 首阴反包
-# 形态阈值，后续根据回测调整。
+# 游资选股筛网 v2 — 趋势预过滤 + 三大信号
 #
-# 回测结果（随机组 450 只，2025-01-01 ~ 2026-06-18，调参前）：
-#   选中 405/450 只，平均胜率 34.7%，平均收益 +0.08%
+# 预过滤（砍掉 ~80% 票）:
+#   - 趋势: MA20 > MA60 > MA120
+#   - 流动性: 日均成交额 > 5000 万
 #
-# 调参 v1：收紧选股门槛，减少信号数量，提高信号质量。
+# 信号:
+#   A 趋势回踩: 多头票回踩 MA20 后放量反弹
+#   B 动量突破: 放量突破 10 日高点
+#   C 强度确认: 强势涨幅 + 放量 + 趋势完好
 screen: hot_money_screener
 params:
-  max_picks: 5                 # 每日最多选 N 只（8→5，更精选）
-  ma_period: 20                # 均线/量比周期
-  trend_ma_period: 60          # 趋势过滤均线
-  breakout_lookback: 20        # 突破回看天数
+  max_picks: 8                 # 每日最多选 N 只
+  # 预过滤
+  min_daily_amount: 50_000_000  # 最低日均成交额（5000 万）
 
-  # 信号1: 放量起涨
-  breakout_min_gain: 0.07      # 当日最小涨幅（0.05→0.07）
-  breakout_volume_ratio: 3.0   # 最小量比（2.0→3.0）
-  breakout_min_body: 0.03      # 最小实体幅度（过滤一字板）
+  # 信号 A: 趋势回踩
+  pullback_near_ma_pct: 0.03   # 收盘价距 MA20 的百分比内
+  pullback_gain_min: 0.015     # 回踩日最小涨幅
+  pullback_vol_ratio: 1.5      # 量比
 
-  # 信号2: 首阴反包
-  reversal_lookback_strong_days: 10   # 前置强势回看天数
-  reversal_strong_count: 2            # 该区间内≥5%涨幅天数
-  reversal_strong_gain: 0.05          # 强势日涨幅阈值
-  reversal_first_yin_drop: 0.03       # 首阴最小跌幅（0.02→0.03）
-  reversal_gain: 0.05                 # 反包日最小涨幅（0.03→0.05）
+  # 信号 B: 动量突破
+  breakout_period: 10          # 突破 N 日高点
+  breakout_gain_min: 0.03      # 当日最小涨幅
+  breakout_vol_ratio: 1.5      # 量比
 
-  # 排除项
-  exclude_min_history_days: 60        # 最少上市天数
+  # 信号 C: 强度确认
+  strength_gain_min: 0.03      # 最小涨幅
+  strength_vol_ratio: 2.0      # 量比

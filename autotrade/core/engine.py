@@ -4,6 +4,7 @@
 - analyze_stock(): 单股分析+回测，最基础入口
 - analyze_universe(): 批量回测一组股票
 - run_backtest(): 顶层入口，支持单股/多股/全市场，渲染报告
+- run_screener_backtest(): 游资两段式回测（先选股再择时）
 """
 
 from __future__ import annotations
@@ -23,9 +24,10 @@ from autotrade.core.datasource_factory import (
 from autotrade.core.interfaces import DataSource, Indicator, Reporter, Strategy
 from autotrade.core.models import BacktestConfig, BacktestResult, Signal
 from autotrade.registry import (
-    get_datasource, get_indicator, get_reporter, get_strategy,
-    init_registry, list_strategies,
+    get_datasource, get_indicator, get_reporter, get_screener,
+    get_strategy, init_registry, list_strategies,
 )
+from autotrade.dataSources.local_ds import LocalDataSource
 
 logger = logging.getLogger(__name__)
 
@@ -159,9 +161,9 @@ def run_backtest(
 
     # 解析日期
     if end is None:
-        end = date.today()
+        end = date(2026, 6, 18)
     if start is None:
-        start = date(end.year - 1, end.month, end.day)
+        start = date(2025, 1, 1)
 
     # 解析符号
     resolved_symbols = _resolve_symbols(symbols, datasource_name)
@@ -292,4 +294,160 @@ def _summarize(results: list[BacktestResult]) -> dict[str, Any]:
             "win_rate": r.metrics.get("win_rate", 0),
         })
 
+    return summary
+
+
+# ---- 游资两段式回测 ----
+
+def _load_market_data(
+    symbols: list[str],
+    start: date,
+    end: date,
+    data_dir: str = "data/daily",
+) -> dict[str, pd.DataFrame]:
+    """批量加载全市场 OHLCV 到 {symbol: DataFrame}。
+
+    直接读本地 parquet，不经网络。DataFrame index 为 DatetimeIndex。
+    """
+    ds = LocalDataSource(data_dir=data_dir)
+    market: dict[str, pd.DataFrame] = {}
+    for sym in symbols:
+        try:
+            bars = ds.get_bars(sym, start, end)
+            if bars:
+                market[sym] = _bars_to_dataframe(bars)
+        except Exception as e:
+            logger.debug("加载 %s 失败: %s", sym, e)
+    return market
+
+
+def _load_screener_params(screener_name: str) -> dict[str, Any]:
+    """加载 config/screens/<screener_name>.yaml 的参数。"""
+    import yaml
+    cfg_path = (
+        Path(__file__).resolve().parent.parent.parent
+        / "config" / "screens" / f"{screener_name}.yaml"
+    )
+    if not cfg_path.exists():
+        return {}
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    return data.get("params", {}) or {}
+
+
+def _invert_selection(
+    selection: dict[date, list[tuple[str, float, str]]],
+) -> dict[str, list[date]]:
+    """反转 {date: [(symbol,...)]} 为 {symbol: [date,...]}。"""
+    inverted: dict[str, list[date]] = {}
+    for d, picks in selection.items():
+        for sym, _score, _type in picks:
+            inverted.setdefault(sym, []).append(d)
+    return inverted
+
+
+def run_screener_backtest(
+    screener_name: str,
+    strategy_name: str,
+    start: date,
+    end: date,
+    symbols: str | list[str] = "all",
+    datasource_name: str = FAILOVER_NAME,
+    screener_params: dict[str, Any] | None = None,
+    strategy_params: dict[str, Any] | None = None,
+    reporter_names: tuple[str, ...] = ("console",),
+    stock_names: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """游资两段式回测: 先选股，再对选中票单股择时回测。
+
+    流程:
+      1. 加载全市场 OHLCV
+      2. Screener.scan() → 每日候选 {date: [(symbol, score, type)]}
+      3. 反转为 {symbol: [entry_dates]}
+      4. 对每只选中 symbol 调 analyze_stock(strategy_params 含 allowed_entry_dates)
+      5. 聚合统计
+
+    Args:
+        screener_name: 选股筛网名（如 "hot_money_screener"）。
+        strategy_name: 择时策略名（如 "hot_money"）。
+        start/end: 回测区间。
+        symbols: "all" 用全市场，或代码列表。
+        screener_params: Screener 参数，None 则从 YAML 加载。
+        strategy_params: Strategy 出场参数（None 则 YAML），
+            allowed_entry_dates 会被自动注入（覆盖用户值）。
+    """
+    init_registry()
+
+    # ---- 1. 解析 symbols + 加载全市场数据 ----
+    resolved = _resolve_symbols(symbols, datasource_name)
+    if not resolved:
+        return {"error": "No symbols to analyze", "results": []}
+
+    market_data = _load_market_data(resolved, start, end)
+    if not market_data:
+        return {"error": "No market data loaded", "results": []}
+
+    # 交易日序列（取所有票日期的并集，升序）
+    all_dates: set[date] = set()
+    for df in market_data.values():
+        for v in df.index:
+            d = v.date() if hasattr(v, "date") else v
+            all_dates.add(d)
+    scan_dates = sorted(all_dates)
+
+    # ---- 2. 选股 ----
+    s_params = screener_params
+    if s_params is None:
+        s_params = _load_screener_params(screener_name)
+    screener_cls = get_screener(screener_name)
+    screener = screener_cls(**s_params)
+    selection = screener.scan(market_data, scan_dates)
+
+    # ---- 3. 反转 ----
+    symbol_to_entry_dates = _invert_selection(selection)
+    logger.info(
+        "Screener 选中 %d 只票，共 %d 个进场日",
+        len(symbol_to_entry_dates),
+        sum(len(v) for v in symbol_to_entry_dates.values()),
+    )
+
+    if not symbol_to_entry_dates:
+        return {"error": "Screener selected no stocks", "results": []}
+
+    # ---- 4. 对选中票单股回测 ----
+    names = stock_names or {}
+    results_list: list[BacktestResult] = []
+    for sym, entry_dates in symbol_to_entry_dates.items():
+        # 合并出场参数 + 注入 allowed_entry_dates
+        merged_params: dict[str, Any] = {}
+        if strategy_params:
+            merged_params.update(strategy_params)
+        merged_params["allowed_entry_dates"] = entry_dates
+        try:
+            result = analyze_stock(
+                sym, strategy_name, start, end,
+                datasource_name, None, merged_params,
+                stock_name=names.get(sym, ""),
+            )
+            results_list.append(result)
+        except Exception as e:
+            logger.error("回测 %s 失败: %s", sym, e)
+            results_list.append(BacktestResult(
+                symbol=sym, stock_name=names.get(sym, ""),
+                metrics={"error": str(e)},
+            ))
+
+    # ---- 5. 报告 + 汇总 ----
+    for result in results_list:
+        for rep_name in reporter_names:
+            try:
+                reporter_cls = get_reporter(rep_name)
+                reporter = reporter_cls() if isinstance(reporter_cls, type) else reporter_cls
+                reporter.render(result)
+            except Exception as e:
+                logger.error("Reporter '%s' 失败: %s", rep_name, e)
+
+    summary = _summarize(results_list)
+    summary["screener"] = screener_name
+    summary["selection_count"] = len(symbol_to_entry_dates)
     return summary

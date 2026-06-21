@@ -205,3 +205,80 @@ def test_excludes_short_history():
     scan_date = df.index[-1].date()
     result = _run_screener(market, [scan_date])
     assert result.get(scan_date, []) == []
+
+
+# ============================================================
+# 端到端: run_screener_backtest 集成测试（合成数据, 临时缓存）
+# ============================================================
+import os
+import tempfile
+from datetime import date as _date
+
+
+def _seed_parquet(symbol, df, data_dir):
+    """把合成 df 写入临时 parquet 缓存目录, 供 LocalDataSource 读取。"""
+    out = pd.DataFrame({
+        "symbol": symbol,
+        "date": df.index,
+        "open": df["open"].values,
+        "high": df["high"].values,
+        "low": df["low"].values,
+        "close": df["close"].values,
+        "volume": df["volume"].values,
+        "amount": df["volume"].values * df["close"].values,
+    })
+    out["date"] = pd.to_datetime(out["date"])
+    os.makedirs(data_dir, exist_ok=True)
+    out.to_parquet(os.path.join(data_dir, f"{symbol}.parquet"), index=False)
+
+
+def test_run_screener_backtest_end_to_end(monkeypatch):
+    """用合成数据走通: 选股 → 回测 → 汇总。"""
+    from autotrade.dataSources.local_ds import LocalDataSource as _LocalDS
+
+    tmp = tempfile.mkdtemp()
+    # 构造 2 只票: 000001 触发放量起涨, 000002 平淡不触发
+    closes_a = [10.0] * 100
+    closes_a[-1] = 11.0
+    volumes_a = [1e6] * 100
+    volumes_a[-1] = 5e6
+    df_a = _make_market("000001", closes_a, volumes_a)
+    _seed_parquet("000001", df_a, tmp)
+
+    df_b = _make_market("000002", [10.0] * 100, [1e6] * 100)
+    _seed_parquet("000002", df_b, tmp)
+
+    # 让所有 LocalDataSource 都用临时目录
+    def _local_ds_factory(data_dir="data/daily"):
+        return _LocalDS(data_dir=tmp)
+
+    monkeypatch.setattr(
+        "autotrade.core.engine.LocalDataSource",
+        _local_ds_factory,
+    )
+    # analyze_stock 通过 build_datasource_from_name 获取数据源,
+    # 它内部 build_failover_datasource 会尝试 local→tushare→akshare。
+    # 我们直接 patch 整个 build_datasource_from_name 返回 local。
+    from autotrade.core import engine as engine_mod
+    monkeypatch.setattr(
+        engine_mod,
+        "build_datasource_from_name",
+        lambda name=None, config=None: _LocalDS(data_dir=tmp),
+    )
+
+    from autotrade.core.engine import run_screener_backtest
+
+    start = _date(2024, 1, 1)
+    end = _date(2024, 4, 15)
+    summary = run_screener_backtest(
+        screener_name="hot_money_screener",
+        strategy_name="hot_money",
+        start=start, end=end,
+        symbols=["000001", "000002"],
+        reporter_names=(),
+    )
+
+    assert "error" not in summary
+    assert summary["selection_count"] >= 1
+    syms = [r["symbol"] for r in summary["results"]]
+    assert "000001" in syms

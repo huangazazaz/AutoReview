@@ -116,6 +116,20 @@ class HotMoneyStrategy(Strategy):
                     trailing_active = False
                     continue
 
+                # 闸门2: 时间止损
+                if days_held >= self.time_stop_days and gain < self.time_stop_min_gain:
+                    signals.append(Signal(
+                        symbol="",
+                        date=current_date,
+                        action="SELL",
+                        strength=1.0,
+                        reason=f"时间止损({days_held}天 +{gain:.1%})",
+                    ))
+                    entry_price = None
+                    highest_price = 0.0
+                    trailing_active = False
+                    continue
+
                 # 闸门1: 移动止盈（已启动且回撤达标）
                 if trailing_active:
                     drawdown_from_high = (current_close - highest_price) / highest_price
@@ -131,19 +145,5 @@ class HotMoneyStrategy(Strategy):
                         highest_price = 0.0
                         trailing_active = False
                         continue
-
-                # 闸门2: 时间止损
-                if days_held >= self.time_stop_days and gain < self.time_stop_min_gain:
-                    signals.append(Signal(
-                        symbol="",
-                        date=current_date,
-                        action="SELL",
-                        strength=1.0,
-                        reason=f"时间止损({days_held}天 +{gain:.1%})",
-                    ))
-                    entry_price = None
-                    highest_price = 0.0
-                    trailing_active = False
-                    continue
 
         return signals

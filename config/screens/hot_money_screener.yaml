@@ -1,23 +1,28 @@
 # 游资选股筛网 — 放量起涨 + 首阴反包
-# 形态阈值, 后续根据回测调整。
+# 形态阈值，后续根据回测调整。
+#
+# 回测结果（随机组 450 只，2025-01-01 ~ 2026-06-18，调参前）：
+#   选中 405/450 只，平均胜率 34.7%，平均收益 +0.08%
+#
+# 调参 v1：收紧选股门槛，减少信号数量，提高信号质量。
 screen: hot_money_screener
 params:
-  max_picks: 8                 # 每日最多选 N 只
+  max_picks: 5                 # 每日最多选 N 只（8→5，更精选）
   ma_period: 20                # 均线/量比周期
   trend_ma_period: 60          # 趋势过滤均线
   breakout_lookback: 20        # 突破回看天数
 
   # 信号1: 放量起涨
-  breakout_min_gain: 0.05      # 当日最小涨幅
-  breakout_volume_ratio: 2.0   # 最小量比
+  breakout_min_gain: 0.07      # 当日最小涨幅（0.05→0.07）
+  breakout_volume_ratio: 3.0   # 最小量比（2.0→3.0）
   breakout_min_body: 0.03      # 最小实体幅度（过滤一字板）
 
   # 信号2: 首阴反包
   reversal_lookback_strong_days: 10   # 前置强势回看天数
   reversal_strong_count: 2            # 该区间内≥5%涨幅天数
   reversal_strong_gain: 0.05          # 强势日涨幅阈值
-  reversal_first_yin_drop: 0.02       # 首阴最小跌幅
-  reversal_gain: 0.03                 # 反包日最小涨幅
+  reversal_first_yin_drop: 0.03       # 首阴最小跌幅（0.02→0.03）
+  reversal_gain: 0.05                 # 反包日最小涨幅（0.03→0.05）
 
   # 排除项
   exclude_min_history_days: 60        # 最少上市天数

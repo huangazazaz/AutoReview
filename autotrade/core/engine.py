@@ -299,6 +299,32 @@ def _summarize(results: list[BacktestResult]) -> dict[str, Any]:
 
 # ---- 游资两段式回测 ----
 
+_ST_CACHE: set | None = None
+
+
+def _load_st_exclusion_set() -> set:
+    """从 data/a_stock_list.csv 加载 ST/*ST 股票代码集合。"""
+    global _ST_CACHE
+    if _ST_CACHE is not None:
+        return _ST_CACHE
+    csv_path = (
+        Path(__file__).resolve().parent.parent.parent
+        / "data" / "a_stock_list.csv"
+    )
+    _ST_CACHE = set()
+    if not csv_path.exists():
+        return _ST_CACHE
+    try:
+        df = pd.read_csv(csv_path)
+        if "code" in df.columns and "name" in df.columns:
+            st_mask = df["name"].str.contains("ST", na=False)
+            _ST_CACHE = set(str(c) for c in df.loc[st_mask, "code"])
+        logger.info("ST 排除: %d 只", len(_ST_CACHE))
+    except Exception as e:
+        logger.warning("加载 ST 列表失败: %s", e)
+    return _ST_CACHE
+
+
 def _load_market_data(
     symbols: list[str],
     start: date,
@@ -382,6 +408,14 @@ def run_screener_backtest(
     resolved = _resolve_symbols(symbols, datasource_name)
     if not resolved:
         return {"error": "No symbols to analyze", "results": []}
+
+    # 排除 ST / *ST 股票
+    st_exclude = _load_st_exclusion_set()
+    if st_exclude:
+        resolved = [s for s in resolved if s not in st_exclude]
+        logger.info("排除 ST 后剩余 %d 只", len(resolved))
+    if not resolved:
+        return {"error": "All symbols excluded as ST", "results": []}
 
     market_data = _load_market_data(resolved, start, end)
     if not market_data:

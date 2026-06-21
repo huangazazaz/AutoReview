@@ -33,12 +33,17 @@ class HotMoneyScreener(Screener):
 
     def __init__(
         self,
-        max_picks: int = 8,
+        max_picks: int = 3,
+        min_score: float = 0.15,                # 最低评分门槛
         # 预过滤
         min_daily_amount: float = 50_000_000,   # 最低日均成交额
         trend_ma_fast: int = 20,
         trend_ma_mid: int = 60,
         trend_ma_slow: int = 120,
+        # 动量排名
+        momentum_lookback: int = 60,             # 动量回看天数
+        momentum_min: float = 0.05,              # 最低 60 日涨幅（排除弱势票）
+        momentum_max: float = 0.60,              # 最高 60 日涨幅（排除过度拉伸票）
         # 信号 A: 趋势回踩
         pullback_near_ma_pct: float = 0.03,      # 收盘价距 MA20 的百分比内
         pullback_gain_min: float = 0.015,         # 回踩日最小涨幅
@@ -54,10 +59,14 @@ class HotMoneyScreener(Screener):
         exclude_min_history_days: int = 120,
     ):
         self.max_picks = max_picks
+        self.min_score = min_score
         self.min_daily_amount = min_daily_amount
         self.trend_ma_fast = trend_ma_fast
         self.trend_ma_mid = trend_ma_mid
         self.trend_ma_slow = trend_ma_slow
+        self.momentum_lookback = momentum_lookback
+        self.momentum_min = momentum_min
+        self.momentum_max = momentum_max
         self.pullback_near_ma_pct = pullback_near_ma_pct
         self.pullback_gain_min = pullback_gain_min
         self.pullback_vol_ratio = pullback_vol_ratio
@@ -76,8 +85,8 @@ class HotMoneyScreener(Screener):
         market_data: dict[str, pd.DataFrame],
         dates: list[date],
     ) -> dict[date, list[tuple[str, float, str]]]:
-        """逐日扫描，预过滤后按信号评分取前 max_picks。"""
-        # ---- 预计算所有票的均线列 ----
+        """逐日扫描：预过滤 → 动量排名 → 信号评估。"""
+        # ---- 预计算均线 ----
         for sym, df in market_data.items():
             if len(df) < self.exclude_min_history_days:
                 continue
@@ -85,19 +94,41 @@ class HotMoneyScreener(Screener):
             df["_ma_mid"] = _sma(df["close"], self.trend_ma_mid)
             df["_ma_slow"] = _sma(df["close"], self.trend_ma_slow)
             df["_amount_ma"] = _sma(df["amount"], self.trend_ma_fast)
+            # 动量列
+            df["_mom_ret"] = df["close"].pct_change(periods=self.momentum_lookback)
 
         result: dict[date, list[tuple[str, float, str]]] = {}
         for scan_date in dates:
-            candidates: list[tuple[str, float, str]] = []
+            # ---- 第一遍：预过滤 + 动量区间 ----
+            passing: list[tuple[str, int, float]] = []  # (sym, idx, mom_ret)
             for sym, df in market_data.items():
                 idx = self._index_of(df, scan_date)
                 if idx is None:
                     continue
-                scored = self._evaluate(sym, df, idx)
+                if not self._passes_prefilter(df, idx):
+                    continue
+                mr = float(df["_mom_ret"].iloc[idx])
+                if pd.isna(mr):
+                    continue
+                # 动量区间过滤：太弱或太强都不要
+                if mr < self.momentum_min or mr > self.momentum_max:
+                    continue
+                passing.append((sym, idx, mr))
+
+            if not passing:
+                result[scan_date] = []
+                continue
+
+            # ---- 第二遍：信号评估 ----
+            candidates: list[tuple[str, float, str]] = []
+            for sym, idx, _mr in passing:
+                scored = self._evaluate(sym, market_data[sym], idx)
                 if scored is not None:
                     candidates.append(scored)
             candidates.sort(key=lambda x: x[1], reverse=True)
-            result[scan_date] = candidates[: self.max_picks]
+            qualified = [c for c in candidates if c[1] >= self.min_score]
+            result[scan_date] = qualified[: self.max_picks]
+
         return result
 
     # ------------------------------------------------------------------
@@ -132,6 +163,8 @@ class HotMoneyScreener(Screener):
     # ------------------------------------------------------------------
     def _passes_prefilter(self, df: pd.DataFrame, idx: int) -> bool:
         """趋势 + 流动性预过滤。"""
+        if "_ma_fast" not in df.columns:
+            return False
         close = df["close"]
         vol = df["volume"]
         open_ = df["open"]

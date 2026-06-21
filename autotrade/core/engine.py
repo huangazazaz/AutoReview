@@ -17,7 +17,7 @@ from typing import Any, Optional
 import pandas as pd
 
 from autotrade.core.backtester import Backtester
-from autotrade.core.config import get_backtest_config, load_config
+from autotrade.core.config import get_backtest_config, get_strategy_params, load_config
 from autotrade.core.datasource_factory import (
     FAILOVER_NAME, build_datasource_from_name,
 )
@@ -451,9 +451,10 @@ def run_screener_backtest(
     # ---- 4. 对选中票单股回测 ----
     names = stock_names or {}
     results_list: list[BacktestResult] = []
+    # 从 YAML 加载出场参数作为基准，用户传入的 strategy_params 可覆盖
+    base_exit_params = get_strategy_params(strategy_name).get("params", {}) or {}
     for sym, entry_dates in symbol_to_entry_dates.items():
-        # 合并出场参数 + 注入 allowed_entry_dates
-        merged_params: dict[str, Any] = {}
+        merged_params: dict[str, Any] = dict(base_exit_params)
         if strategy_params:
             merged_params.update(strategy_params)
         merged_params["allowed_entry_dates"] = entry_dates

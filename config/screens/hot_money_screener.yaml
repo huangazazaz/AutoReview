@@ -1,29 +1,22 @@
-# 游资选股筛网 v2 — 趋势预过滤 + 三大信号
-#
-# 预过滤（砍掉 ~80% 票）:
-#   - 趋势: MA20 > MA60 > MA120
-#   - 流动性: 日均成交额 > 5000 万
-#
-# 信号:
-#   A 趋势回踩: 多头票回踩 MA20 后放量反弹
-#   B 动量突破: 放量突破 10 日高点
-#   C 强度确认: 强势涨幅 + 放量 + 趋势完好
+# 游资选股筛网 v3 — 趋势预过滤 + 动量区间 + 质量门槛
 screen: hot_money_screener
 params:
-  max_picks: 8                 # 每日最多选 N 只
-  # 预过滤
-  min_daily_amount: 50_000_000  # 最低日均成交额（5000 万）
+  max_picks: 5
+  min_score: 0.10
+  min_daily_amount: 50_000_000
 
-  # 信号 A: 趋势回踩
-  pullback_near_ma_pct: 0.03   # 收盘价距 MA20 的百分比内
-  pullback_gain_min: 0.015     # 回踩日最小涨幅
-  pullback_vol_ratio: 1.5      # 量比
+  # 动量区间（排除弱势票和过度拉伸票）
+  momentum_lookback: 60
+  momentum_min: 0.05           # 60 日涨幅 >= 5%
+  momentum_max: 0.50           # 60 日涨幅 <= 50%
 
-  # 信号 B: 动量突破
-  breakout_period: 10          # 突破 N 日高点
-  breakout_gain_min: 0.03      # 当日最小涨幅
-  breakout_vol_ratio: 1.5      # 量比
+  pullback_near_ma_pct: 0.03
+  pullback_gain_min: 0.015
+  pullback_vol_ratio: 1.5
 
-  # 信号 C: 强度确认
-  strength_gain_min: 0.03      # 最小涨幅
-  strength_vol_ratio: 2.0      # 量比
+  breakout_period: 10
+  breakout_gain_min: 0.03
+  breakout_vol_ratio: 1.5
+
+  strength_gain_min: 0.03
+  strength_vol_ratio: 2.0

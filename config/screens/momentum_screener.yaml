@@ -1,0 +1,21 @@
+# 动量多因子选股 — 聚焦近1个月走势，综合打分选股
+screen: momentum_screener
+params:
+  # 预筛选
+  min_amount: 50000000
+  mom_1m_min: 0.03
+  mom_1m_max: 0.40
+  exclude_min_history_days: 60
+
+  # 因子权重 (总和应为1.0)
+  weight_mom_1m: 0.20
+  weight_mom_5d: 0.15
+  weight_vol_ratio: 0.15
+  weight_ma_score: 0.15
+  weight_pullback: 0.15
+  weight_atr_ratio: 0.10
+  weight_consistency: 0.10
+
+  # 入选控制
+  score_threshold: 0.65
+  top_n_per_day: 10

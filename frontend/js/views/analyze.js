@@ -15,10 +15,6 @@
         const TrendingDown = _.trendingDown || (() => '');
         const File = _.folder || (() => '');
         const XCircle = _.xCircle || (() => '');
-        const Hash = _.hash || (() => '');
-        const Brain = _.brain || (() => '');
-        const Database = _.database || (() => '');
-        const Clock = _.clock || (() => '');
 
         // 清理旧图表
         if (chartInstance) { chartInstance.dispose(); chartInstance = null; }
@@ -38,58 +34,47 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label" for="analyze-symbol">股票代码 <span class="required" aria-hidden="true">*</span><span class="sr-only">必填</span></label>
-                            <div class="input-with-clear input-icon-wrapper stock-input" id="analyze-symbol-wrapper">
-                                <span class="input-icon">${Hash({ size: 16 })}</span>
+                            <div class="input-with-clear">
                                 <input type="text" class="form-input" id="analyze-symbol"
                                     placeholder="如 600522, 000001" maxlength="6" autofocus autocomplete="off"
                                     list="analyze-symbol-list">
                                 <button type="button" class="input-clear-btn" id="analyze-symbol-clear"
-                                    title="清空" aria-label="清空股票代码" tabindex="-1">${XCircle({ size: 14 })}</button>
+                                    title="清空" aria-label="清空股票代码" tabindex="-1">&times;</button>
                             </div>
                             <datalist id="analyze-symbol-list"></datalist>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="analyze-strategy">策略</label>
-                            <div class="input-icon-wrapper">
-                                <span class="input-icon">${Brain({ size: 16 })}</span>
-                                <select class="form-select" id="analyze-strategy"></select>
-                            </div>
+                            <select class="form-select" id="analyze-strategy"></select>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="analyze-period">周期</label>
-                            <div class="input-icon-wrapper">
-                                <span class="input-icon">${Clock({ size: 16 })}</span>
-                                <select class="form-select" id="analyze-period">
-                                    <option value="">自定义日期</option>
-                                    <option value="1y">最近 1 年</option>
-                                    <option value="6m">最近 6 个月</option>
-                                    <option value="3m">最近 3 个月</option>
-                                    <option value="20d">最近 20 天</option>
-                                    <option value="60t">最近 60 交易日</option>
-                                </select>
-                            </div>
+                            <select class="form-select" id="analyze-period">
+                                <option value="1y">最近 1 年</option>
+                                <option value="6m">最近 6 个月</option>
+                                <option value="3m">最近 3 个月</option>
+                                <option value="20d">最近 20 天</option>
+                                <option value="60t">最近 60 交易日</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="analyze-datasource">数据源</label>
-                            <div class="input-icon-wrapper">
-                                <span class="input-icon">${Database({ size: 16 })}</span>
-                                <select class="form-select" id="analyze-datasource">
-                                    <option value="">自动（主备降级）</option>
-                                </select>
-                            </div>
+                            <select class="form-select" id="analyze-datasource">
+                                <option value="">自动（主备降级）</option>
+                            </select>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label class="form-label" for="analyze-start">开始日期</label>
                             <input type="text" class="form-input date-input" id="analyze-start"
-                                placeholder="开始日期" value="2025-01-01" autocomplete="off"
+                                placeholder="开始日期" autocomplete="off"
                                 onfocus="this.type='date';this.showPicker?.()" onblur="if(!this.value)this.type='text'">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="analyze-end">结束日期</label>
                             <input type="text" class="form-input date-input" id="analyze-end"
-                                placeholder="结束日期" value="2026-06-18" autocomplete="off"
+                                placeholder="结束日期" autocomplete="off"
                                 onfocus="this.type='date';this.showPicker?.()" onblur="if(!this.value)this.type='text'">
                         </div>
                         <div class="form-group" style="display:flex; align-items:flex-end;">
@@ -180,22 +165,17 @@
                 .map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
         }
 
-        // 股票代码输入框快捷清空 + 格式验证视觉反馈
+        // 股票代码输入框快捷清空
         const symbolInput = document.getElementById('analyze-symbol');
-        const symbolWrapper = document.getElementById('analyze-symbol-wrapper');
         const symbolClear = document.getElementById('analyze-symbol-clear');
-        if (symbolInput && symbolClear && symbolWrapper) {
+        if (symbolInput && symbolClear) {
             const toggleClearBtn = () => {
-                const val = symbolInput.value.trim();
-                symbolClear.classList.toggle('visible', !!val);
-                // 6 位纯数字 = 有效股票代码格式，金色高亮
-                symbolWrapper.classList.toggle('valid', val.length === 6 && /^\d{6}$/.test(val));
+                symbolClear.classList.toggle('visible', !!symbolInput.value);
             };
             symbolInput.addEventListener('input', toggleClearBtn);
             symbolClear.addEventListener('click', () => {
                 symbolInput.value = '';
                 symbolClear.classList.remove('visible');
-                symbolWrapper.classList.remove('valid');
                 symbolInput.focus();
             });
             toggleClearBtn();
@@ -214,18 +194,15 @@
             const params = {
                 symbol: symbol,
                 strategy: document.getElementById('analyze-strategy').value,
+                period: document.getElementById('analyze-period').value,
             };
             const ds = document.getElementById('analyze-datasource').value;
             if (ds) params.datasource = ds;
-            const period = document.getElementById('analyze-period').value;
-            if (period) {
-                params.period = period;
-            } else {
-                const start = document.getElementById('analyze-start').value;
-                const end = document.getElementById('analyze-end').value;
-                if (start) params.start = start;
-                if (end) params.end = end;
-            }
+            const start = document.getElementById('analyze-start').value;
+            const end = document.getElementById('analyze-end').value;
+            if (start) params.start = start;
+            if (end) params.end = end;
+            if (start || end) delete params.period;
 
             // 收集策略参数覆盖值
             const paramInputs = document.querySelectorAll('#analyze-params .param-input');

@@ -60,7 +60,7 @@ class AnalyzeRequest(BaseModel):
     strategy: str = "ma_cross"
     start: Optional[str] = None
     end: Optional[str] = None
-    period: Optional[str] = None
+    period: Optional[str] = "1y"
     datasource: Optional[str] = None
     strategy_params: Optional[dict] = None  # 策略参数覆盖
 
@@ -71,7 +71,7 @@ class BacktestRequest(BaseModel):
     group: Optional[str] = None          # "自选"
     start: Optional[str] = None
     end: Optional[str] = None
-    period: Optional[str] = None
+    period: Optional[str] = "1y"
     datasource: Optional[str] = None
     strategy_params: Optional[dict] = None  # 策略参数覆盖
 
@@ -349,7 +349,7 @@ class BarsRequest(BaseModel):
     symbol: str
     start: Optional[str] = None
     end: Optional[str] = None
-    period: Optional[str] = None
+    period: Optional[str] = "1y"
 
 
 @app.post("/bars")
@@ -394,17 +394,17 @@ def health():
 # ---- 工具函数 ----
 
 def _resolve_dates(start_str, end_str, period_str):
-    """解析日期：显式日期 > period > 默认 2025-01-01 ~ 2026-06-18。"""
+    """解析日期：显式日期 > period > 默认1年。"""
     from autotrade.triggers.cli import _parse_date, _parse_period
 
     s = _parse_date(start_str)
     e = _parse_date(end_str)
     if s is None and e is None:
-        s, e = _parse_period(period_str) if period_str else (None, None)
+        s, e = _parse_period(period_str or "1y")
     if e is None:
-        e = date(2026, 6, 18)
+        e = date.today()
     if s is None:
-        s = date(2025, 1, 1)
+        s = date(e.year - 1, e.month, e.day)
     return s, e
 
 

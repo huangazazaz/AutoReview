@@ -76,7 +76,6 @@
                         <div class="form-group">
                             <label class="form-label" for="bt-period">周期</label>
                             <select class="form-select" id="bt-period">
-                                <option value="">自定义日期</option>
                                 <option value="1y">最近 1 年</option>
                                 <option value="6m">最近 6 个月</option>
                                 <option value="3m">最近 3 个月</option>
@@ -93,13 +92,13 @@
                         <div class="form-group">
                             <label class="form-label" for="bt-start">开始日期</label>
                             <input type="text" class="form-input date-input" id="bt-start"
-                                placeholder="开始日期" value="2025-01-01" autocomplete="off"
+                                placeholder="开始日期" autocomplete="off"
                                 onfocus="this.type='date';this.showPicker?.()" onblur="if(!this.value)this.type='text'">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="bt-end">结束日期</label>
                             <input type="text" class="form-input date-input" id="bt-end"
-                                placeholder="结束日期" value="2026-06-18" autocomplete="off"
+                                placeholder="结束日期" autocomplete="off"
                                 onfocus="this.type='date';this.showPicker?.()" onblur="if(!this.value)this.type='text'">
                         </div>
                         <div class="form-group" style="display:flex; align-items:flex-end;">
@@ -265,6 +264,7 @@
         document.getElementById('bt-submit').addEventListener('click', async () => {
             const params = {
                 strategy: document.getElementById('bt-strategy').value,
+                period: document.getElementById('bt-period').value,
             };
 
             if (inputMode === 'symbols') {
@@ -280,17 +280,11 @@
             const ds = document.getElementById('bt-datasource').value;
             if (ds) params.datasource = ds;
 
-            const period = document.getElementById('bt-period').value;
-            if (period) {
-                // 用户显式选择了周期快捷选项，忽略日期输入
-                params.period = period;
-            } else {
-                // 使用显式日期（含默认值 2025-01-01 ~ 2026-06-18）
-                const start = document.getElementById('bt-start').value;
-                const end = document.getElementById('bt-end').value;
-                if (start) params.start = start;
-                if (end) params.end = end;
-            }
+            const start = document.getElementById('bt-start').value;
+            const end = document.getElementById('bt-end').value;
+            if (start) params.start = start;
+            if (end) params.end = end;
+            if (start || end) delete params.period;
 
             // 收集策略参数覆盖值
             const paramInputs = document.querySelectorAll('#bt-params .param-input');

@@ -50,7 +50,7 @@ def cli(verbose: bool):
 @click.option("--strategy", "strategy_name", required=True, help="策略名")
 @click.option("--start", default=None, help="开始日期 (YYYY-MM-DD)")
 @click.option("--end", default=None, help="结束日期 (YYYY-MM-DD)")
-@click.option("--period", "-p", default=None, help="快捷周期: 1y/6m/20d/60t (默认 2025-01-01 ~ 2026-06-18)")
+@click.option("--period", "-p", default=None, help="快捷周期: 1y/6m/20d/60t (默认1y)")
 @click.option("--datasource", default=None, help="数据源 (默认 akshare)")
 @click.option("--reporters", default="console", help="报告输出方式，逗号分隔")
 def analyze(symbol: str, strategy_name: str, start: Optional[str],
@@ -74,7 +74,7 @@ def analyze(symbol: str, strategy_name: str, start: Optional[str],
 @click.option("--group", default=None, help="股票分组名 (config/groups/<name>.yaml)")
 @click.option("--start", default=None, help="开始日期 (YYYY-MM-DD)")
 @click.option("--end", default=None, help="结束日期 (YYYY-MM-DD)")
-@click.option("--period", "-p", default=None, help="快捷周期: 1y/6m/20d/60t (默认 2025-01-01 ~ 2026-06-18)")
+@click.option("--period", "-p", default=None, help="快捷周期: 1y/6m/20d/60t (默认1y)")
 @click.option("--datasource", default=None, help="数据源 (默认 akshare)")
 @click.option("--reporters", default="console", help="报告输出方式，逗号分隔")
 def backtest(strategy_name: str, symbols: Optional[str], group: Optional[str],
@@ -206,10 +206,10 @@ def _parse_period(period: Optional[str]) -> tuple[Optional[date], Optional[date]
     """解析周期快捷参数，返回 (start, end)。
 
     支持: 1y(年) 6m(月) 20d(日历日) 60t(交易日, 近似日历日×1.4)
-    无参数时返回 (None, None)，由调用方决定默认值。
+    默认: 1y
     """
     if not period:
-        return None, None
+        period = "1y"
 
     import re
     m = re.match(r"^(\d+)\s*([ymdt])$", period.lower().strip())
@@ -306,15 +306,12 @@ def _run_and_report(strategy_name: str, symbols: str,
     ds = datasource or config.get("datasource", {}).get("default", "failover")
     reporter_list = [r.strip() for r in reporters.split(",") if r.strip()]
 
-    # 日期：显式 start/end 优先 → period → 默认 2025-01-01 ~ 2026-06-18
+    # 日期：显式 start/end 优先 → period → 默认 1y
     p_start = _parse_date(start)
     p_end = _parse_date(end)
     if p_start is None and p_end is None:
         if period or not (start or end):
-            p_start, p_end = _parse_period(period)
-            if p_start is None and p_end is None:
-                p_start = date(2025, 1, 1)
-                p_end = date(2026, 6, 18)
+            p_start, p_end = _parse_period(period or "1y")
 
     # 加载策略参数
     strategy_params = get_strategy_params(strategy_name)

@@ -631,9 +631,6 @@ a:hover { color: var(--accent-hover); }
     width: 22px;
     height: 22px;
     padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     font-size: 16px;
     line-height: 1;
     color: var(--text-muted);
@@ -641,7 +638,7 @@ a:hover { color: var(--accent-hover); }
     border: 1px solid var(--border);
     border-radius: 50%;
     cursor: pointer;
-    transition: color 0.15s, background 0.15s, border-color 0.15s, opacity 0.15s, transform 0.15s;
+    transition: color 0.15s, background 0.15s, border-color 0.15s, opacity 0.15s;
     opacity: 0;
     pointer-events: none;
 }
@@ -652,55 +649,9 @@ a:hover { color: var(--accent-hover); }
 }
 
 .input-clear-btn:hover {
-    transform: translateY(-50%) scale(1.15);
-    color: var(--error);
+    color: var(--text-bright);
     background: var(--border);
-    border-color: var(--error);
-}
-
-/* ---- 输入框内嵌图标 ---- */
-.input-icon-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-    width: 100%;
-}
-
-.input-icon-wrapper .form-input,
-.input-icon-wrapper .form-select {
-    padding-left: 38px;
-}
-
-.input-icon-wrapper .input-icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    pointer-events: none;
-    transition: color var(--transition-normal);
-    z-index: 1;
-}
-
-.input-icon-wrapper:focus-within .input-icon {
-    color: var(--accent);
-}
-
-/* ---- 股票代码输入增强 ---- */
-.stock-input.valid .form-input {
-    border-color: rgba(245, 158, 11, 0.4);
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.08);
-}
-
-.stock-input.valid .input-icon {
-    color: var(--primary);
-}
-
-.stock-input .input-clear-btn {
-    right: 6px;
+    border-color: var(--text-muted);
 }
 
 .form-row {

@@ -1,4 +1,4 @@
-"""插件抽象基类：DataSource / Indicator / Strategy / Reporter。"""
+"""插件抽象基类：DataSource / Indicator / Strategy / Reporter / Screener。"""
 
 from __future__ import annotations
 
@@ -53,3 +53,35 @@ class Reporter(ABC):
     @abstractmethod
     def render(self, result: BacktestResult) -> None:
         """输出报告（终端/CSV/图表）。"""
+
+
+class Screener(ABC):
+    """选股筛网插件：横向比较全市场，每日选出候选票。
+
+    与 Strategy 的区别：
+    - Strategy 是"给定一只票在其上择时"（纵向），接收单股 df。
+    - Screener 是"比较全市场挑出当日候选"（横向），接收 {symbol: df} 字典。
+    - 职责切分：Screener 答"今天买谁"，Strategy 答"买了什么时候卖"。
+    """
+
+    name: str = "base"
+    required_indicators: list[Indicator] = []
+
+    def __init__(self):
+        self.required_indicators = []
+
+    @abstractmethod
+    def scan(self, market_data: dict[str, pd.DataFrame],
+             dates: list[date]) -> dict[date, list[tuple[str, float, str]]]:
+        """扫描全市场，逐日选出候选票。
+
+        Args:
+            market_data: {symbol: OHLCV DataFrame}，每个 df 已算好 required_indicators。
+                每个 DataFrame 的 index 为日期（DatetimeIndex 或 date 序列），
+                含 open/high/low/close/volume 列 + ind_xxx 指标列。
+            dates: 待扫描的交易日列表（升序）。
+
+        Returns:
+            {date: [(symbol, score, signal_type), ...]}
+            每日按 score 降序排列的候选列表，signal_type 为 "breakout"/"reversal"。
+        """

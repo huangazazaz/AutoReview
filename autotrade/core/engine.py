@@ -333,17 +333,36 @@ def _load_market_data(
 ) -> dict[str, pd.DataFrame]:
     """批量加载全市场 OHLCV 到 {symbol: DataFrame}。
 
-    直接读本地 parquet，不经网络。DataFrame index 为 DatetimeIndex。
+    使用多线程并行读 parquet，大幅加速全市场加载。
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     ds = LocalDataSource(data_dir=data_dir)
     market: dict[str, pd.DataFrame] = {}
-    for sym in symbols:
+
+    def _load_one(sym: str):
         try:
             bars = ds.get_bars(sym, start, end)
             if bars:
-                market[sym] = _bars_to_dataframe(bars)
-        except Exception as e:
-            logger.debug("加载 %s 失败: %s", sym, e)
+                return sym, _bars_to_dataframe(bars)
+        except Exception:
+            pass
+        return sym, None
+
+    # 多线程并行加载（I/O 密集型，线程足够）
+    max_workers = min(32, len(symbols))
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(_load_one, s): s for s in symbols}
+        done = 0
+        for fut in as_completed(futures):
+            sym, df = fut.result()
+            done += 1
+            if df is not None:
+                market[sym] = df
+            if done % 500 == 0:
+                logger.info("加载进度: %d/%d", done, len(symbols))
+
+    logger.info("全市场加载完成: %d/%d 只有数据", len(market), len(symbols))
     return market
 
 

@@ -75,3 +75,133 @@ def test_custom_thresholds():
     sigs = strat.generate_signals(df)
     sell_reasons = [s.reason for s in sigs if s.action == "SELL"]
     assert any("止损" in r for r in sell_reasons)
+
+
+# ============================================================
+# Screener 测试
+# ============================================================
+from autotrade.screens.hot_money import HotMoneyScreener
+
+
+def _make_market(symbol, closes, volumes=None, start="2024-01-01"):
+    """构造单股 OHLCV DataFrame, 默认 volume=1e6。"""
+    n = len(closes)
+    dates = pd.date_range(start, periods=n, freq="D")
+    closes_arr = np.array(closes, dtype=float)
+    if volumes is None:
+        volumes_arr = np.full(n, 1e6)
+    else:
+        volumes_arr = np.array(volumes, dtype=float)
+    opens = np.concatenate([[closes_arr[0]], closes_arr[:-1]])
+    highs = np.maximum(opens, closes_arr) + 0.05
+    lows = np.minimum(opens, closes_arr) - 0.05
+    df = pd.DataFrame({
+        "open": opens, "high": highs, "low": lows,
+        "close": closes_arr, "volume": volumes_arr,
+    }, index=dates)
+    return df
+
+
+def _run_screener(market_data, dates_to_scan, **params):
+    """辅助: 用默认参数构造 screener 并扫描。"""
+    screener = HotMoneyScreener(**params)
+    return screener.scan(market_data, dates_to_scan)
+
+
+def test_breakout_signal_detected():
+    """放量起涨: 最后一日大涨+放量+突破20日高点 → 应被选中。"""
+    closes = [10.0] * 100
+    closes[-1] = 11.0
+    volumes = [1e6] * 100
+    volumes[-1] = 5e6
+    df = _make_market("000001", closes, volumes)
+    market = {"000001": df}
+    scan_date = df.index[-1].date()
+    result = _run_screener(market, [scan_date])
+    assert scan_date in result
+    picks = result[scan_date]
+    assert len(picks) == 1
+    sym, score, sig_type = picks[0]
+    assert sym == "000001"
+    assert sig_type == "breakout"
+    assert score > 0
+
+
+def test_breakout_rejected_low_volume():
+    """量比不足（<2）的涨幅不应触发放量起涨。"""
+    closes = [10.0] * 100
+    closes[-1] = 11.0
+    volumes = [1e6] * 100
+    volumes[-1] = 1.5e6  # 量比 1.5 < 2
+    df = _make_market("000002", closes, volumes)
+    market = {"000002": df}
+    scan_date = df.index[-1].date()
+    result = _run_screener(market, [scan_date])
+    assert result.get(scan_date, []) == []
+
+
+def test_breakout_rejected_below_trend_ma():
+    """远在 60 日均线下方的反弹不应触发（排除下降趋势）。"""
+    closes = np.linspace(15, 8, 100).tolist()
+    closes[-1] = 8.4
+    volumes = [1e6] * 100
+    volumes[-1] = 5e6
+    df = _make_market("000003", closes, volumes)
+    market = {"000003": df}
+    scan_date = df.index[-1].date()
+    result = _run_screener(market, [scan_date])
+    assert result.get(scan_date, []) == []
+
+
+def test_reversal_signal_detected():
+    """首阴反包: 前10天有2天大涨 → 首阴 → 次日反包 → 应选中。"""
+    closes = [10.0] * 100
+    closes[90] = 10.5  # +5%
+    closes[91] = 10.5
+    closes[92] = 11.03  # +5% from 10.5 (≥5%)
+    closes[93] = 11.0
+    closes[94] = 11.0
+    closes[95] = 11.0
+    closes[96] = 11.0
+    closes[97] = 11.0
+    closes[98] = 10.67  # 首阴: -3%
+    closes[99] = 11.20  # 反包: +5%
+    df = _make_market("000004", closes)
+    market = {"000004": df}
+    scan_date = df.index[-1].date()
+    result = _run_screener(market, [scan_date])
+    picks = result.get(scan_date, [])
+    assert len(picks) == 1
+    sym, score, sig_type = picks[0]
+    assert sym == "000004"
+    assert sig_type == "reversal"
+
+
+def test_max_picks_limit():
+    """多只票触发时应按 score 降序只取 max_picks 只。"""
+    market = {}
+    dates_to_scan = None
+    for i, gain in enumerate([0.06, 0.08, 0.10]):
+        sym = f"00000{i + 1}"
+        closes = [10.0] * 100
+        closes[-1] = 10.0 * (1 + gain)
+        volumes = [1e6] * 100
+        volumes[-1] = 5e6
+        market[sym] = _make_market(sym, closes, volumes)
+        if dates_to_scan is None:
+            dates_to_scan = [market[sym].index[-1].date()]
+    result = _run_screener(market, dates_to_scan, max_picks=2)
+    picks = result[dates_to_scan[0]]
+    assert len(picks) == 2
+    assert picks[0][1] >= picks[1][1]
+
+
+def test_excludes_short_history():
+    """上市不足 min_history_days 的票应被排除。"""
+    closes = [10.0, 11.0]  # 仅 2 天, 不足 60
+    volumes = [1e6, 5e6]
+    df = _make_market("000009", closes, volumes)
+    market = {"000009": df}
+    scan_date = df.index[-1].date()
+    result = _run_screener(market, [scan_date])
+    assert result.get(scan_date, []) == []

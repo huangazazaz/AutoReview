@@ -71,7 +71,7 @@ class Backtester:
 
             # --- 执行卖出 ---
             for sig in sell_signals:
-                if position.quantity <= 0:
+                if position.long_qty <= 0:
                     continue
                 if self.config.allow_t_plus_1 and can_sell_after and today < can_sell_after:
                     continue  # T+1 锁定中，不能卖
@@ -103,10 +103,9 @@ class Backtester:
                 )
                 trades.append(trade)
                 cash += amount - commission - stamp_duty
-                position.quantity -= quantity
-                if position.quantity <= 0:
-                    position.avg_cost = 0.0
-                position.market_value = position.quantity * actual_price
+                position.long_qty -= quantity
+                if position.long_qty <= 0:
+                    position.long_avg_cost = 0.0
 
             # --- 执行买入 ---
             for sig in buy_signals:
@@ -137,10 +136,9 @@ class Backtester:
                 cash -= amount + commission
 
                 # 更新持仓均价
-                total_cost = position.avg_cost * position.quantity + amount
-                position.quantity += quantity
-                position.avg_cost = total_cost / position.quantity if position.quantity > 0 else 0
-                position.market_value = position.quantity * actual_price
+                total_cost = position.long_avg_cost * position.long_qty + amount
+                position.long_qty += quantity
+                position.long_avg_cost = total_cost / position.long_qty if position.long_qty > 0 else 0
 
                 # T+1 锁定
                 if self.config.allow_t_plus_1:
@@ -149,8 +147,9 @@ class Backtester:
                         can_sell_after = bars_sorted[i + 1].date
 
             # 更新市值的每日估值
-            position.market_value = position.quantity * bar.close
-            total_equity = cash + position.market_value
+            long_market_value = position.long_qty * bar.close
+            short_market_value = position.short_qty * bar.close
+            total_equity = cash + long_market_value - short_market_value
             equity_series.append(total_equity)
             dates_series.append(today)
 
@@ -196,12 +195,12 @@ class Backtester:
 
     def _compute_sell_quantity(self, position: Position, strength: float) -> int:
         """计算卖出股数。"""
-        if position.quantity <= 0:
+        if position.long_qty <= 0:
             return 0
         if self.config.position_sizing == "strength":
-            quantity = int(position.quantity * strength)
+            quantity = int(position.long_qty * strength)
         else:
-            quantity = position.quantity
+            quantity = position.long_qty
         # 向下取整到 lot_size 的倍数
         quantity = (quantity // self.config.lot_size) * self.config.lot_size
         return max(0, quantity)

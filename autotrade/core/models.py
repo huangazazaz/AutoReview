@@ -33,7 +33,7 @@ class Signal:
     """策略在某一天产生的信号。"""
     symbol: str
     date: date
-    action: str          # "BUY" | "SELL" | "HOLD"
+    action: str          # "BUY" | "SELL" | "SELL_SHORT" | "BUY_TO_COVER"
     strength: float = 1.0  # 信号强度 0~1，供仓位管理用
     reason: str = ""       # 人类可读的理由（如 "MA5上穿MA20"）
 
@@ -43,7 +43,7 @@ class Trade:
     """回测中实际成交的一笔交易。"""
     symbol: str
     date: date
-    action: str          # "BUY" | "SELL"
+    action: str          # "BUY" | "SELL" | "SELL_SHORT" | "BUY_TO_COVER"
     price: float         # 实际成交价（考虑滑点）
     quantity: int        # 成交股数（A股需100股整数倍）
     commission: float    # 手续费
@@ -52,11 +52,16 @@ class Trade:
 
 @dataclass
 class Position:
-    """某时刻的持仓快照。"""
+    """某时刻的持仓快照，支持多空双向。"""
     symbol: str
-    quantity: int = 0
-    avg_cost: float = 0.0     # 持仓均价
-    market_value: float = 0.0  # 当前市值
+    long_qty: int = 0            # 多头持仓股数
+    long_avg_cost: float = 0.0    # 多头持仓均价
+    short_qty: int = 0           # 空头持仓股数
+    short_avg_cost: float = 0.0   # 空头持仓均价
+
+    @property
+    def net_qty(self) -> int:
+        return self.long_qty - self.short_qty
 
 
 @dataclass
@@ -72,6 +77,9 @@ class BacktestConfig:
     allow_t_plus_1: bool = True           # T+1：当日买入次日才能卖
     position_sizing: str = "strength"     # "full" | "strength"
     max_positions: int = 1                # 最大同时持仓股票数
+    allow_short: bool = False             # 是否允许做空
+    short_margin_ratio: float = 1.0       # 融券保证金比例（1.0 = 100%）
+    short_interest_rate: float = 0.085    # 融券年化利率
 
 
 @dataclass

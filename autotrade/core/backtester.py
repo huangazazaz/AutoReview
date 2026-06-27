@@ -65,85 +65,33 @@ class Backtester:
             today = bar.date
             daily_signals = signal_map.get(today, [])
 
-            # 处理当天的信号（先卖后买，避免现金不足）
-            buy_signals = [s for s in daily_signals if s.action == "BUY"]
-            sell_signals = [s for s in daily_signals if s.action == "SELL"]
-
-            # --- 执行卖出 ---
-            for sig in sell_signals:
-                if position.long_qty <= 0:
+            # --- Phase 1: Process SELL signals (exit longs first) ---
+            for sig in daily_signals:
+                if sig.action != "SELL":
                     continue
-                if self.config.allow_t_plus_1 and can_sell_after and today < can_sell_after:
-                    continue  # T+1 锁定中，不能卖
-
-                # 确定成交价
+                if not self._can_sell_today(can_sell_after, today):
+                    continue
                 fill_price = self._get_fill_price(sig, bar, bars_sorted, i, is_buy=False)
                 if fill_price is None:
                     continue
+                cash, trade = self._execute_sell_trade(position, cash, fill_price,
+                                                       sig.strength, bar, sig)
+                if trade:
+                    trades.append(trade)
 
-                # 滑点（卖出成交价降低）
-                actual_price = fill_price * (1 - self.config.slippage)
-
-                # 计算卖出数量（按 strength 比例）
-                quantity = self._compute_sell_quantity(position, sig.strength)
-                if quantity <= 0:
+            # --- Phase 2: Process BUY signals (enter longs after exits) ---
+            for sig in daily_signals:
+                if sig.action != "BUY":
                     continue
-
-                amount = actual_price * quantity
-                commission = max(amount * self.config.commission_rate,
-                                 self.config.min_commission)
-                stamp_duty = amount * self.config.stamp_duty_rate
-
-                trade = Trade(
-                    symbol=symbol, date=today, action="SELL",
-                    price=round(actual_price, 2),
-                    quantity=quantity,
-                    commission=round(commission, 2),
-                    stamp_duty=round(stamp_duty, 2),
-                )
-                trades.append(trade)
-                cash += amount - commission - stamp_duty
-                position.long_qty -= quantity
-                if position.long_qty <= 0:
-                    position.long_avg_cost = 0.0
-
-            # --- 执行买入 ---
-            for sig in buy_signals:
-                # 确定成交价
                 fill_price = self._get_fill_price(sig, bar, bars_sorted, i, is_buy=True)
                 if fill_price is None:
                     continue
-
-                # 滑点（买入成交价提高）
-                actual_price = fill_price * (1 + self.config.slippage)
-
-                # 计算买入数量
-                quantity = self._compute_buy_quantity(cash, actual_price, sig.strength)
-                if quantity <= 0:
-                    continue
-
-                amount = actual_price * quantity
-                commission = max(amount * self.config.commission_rate,
-                                 self.config.min_commission)
-
-                trade = Trade(
-                    symbol=symbol, date=today, action="BUY",
-                    price=round(actual_price, 2),
-                    quantity=quantity,
-                    commission=round(commission, 2),
-                )
-                trades.append(trade)
-                cash -= amount + commission
-
-                # 更新持仓均价
-                total_cost = position.long_avg_cost * position.long_qty + amount
-                position.long_qty += quantity
-                position.long_avg_cost = total_cost / position.long_qty if position.long_qty > 0 else 0
-
-                # T+1 锁定
-                if self.config.allow_t_plus_1:
-                    # 找到下一个交易日
-                    if i + 1 < len(bars_sorted):
+                cash, trade = self._execute_buy_trade(position, cash, fill_price,
+                                                      sig.strength, bar, bars_sorted, i, sig)
+                if trade:
+                    trades.append(trade)
+                    # T+1 锁定
+                    if self.config.allow_t_plus_1 and i + 1 < len(bars_sorted):
                         can_sell_after = bars_sorted[i + 1].date
 
             # 更新市值的每日估值
@@ -176,6 +124,71 @@ class Backtester:
             else:
                 return None  # 最后一天无下一日数据
         return bar.close
+
+    def _can_sell_today(self, can_sell_after: Optional[date], today: date) -> bool:
+        """Check if T+1 restriction allows selling today."""
+        if not self.config.allow_t_plus_1:
+            return True
+        if can_sell_after is None:
+            return True
+        return today >= can_sell_after
+
+    def _execute_sell_trade(self, position: Position, cash: float,
+                            fill_price: float, strength: float,
+                            bar: Bar, sig: Signal) -> tuple[float, Trade | None]:
+        """Execute a SELL order. Returns (updated_cash, trade_or_None)."""
+        actual_price = fill_price * (1 - self.config.slippage)
+        quantity = self._compute_sell_quantity(position, strength)
+        if quantity <= 0:
+            return cash, None
+
+        amount = actual_price * quantity
+        commission = max(amount * self.config.commission_rate,
+                         self.config.min_commission)
+        stamp_duty = amount * self.config.stamp_duty_rate
+
+        trade = Trade(
+            symbol=bar.symbol, date=bar.date, action="SELL",
+            price=round(actual_price, 2),
+            quantity=quantity,
+            commission=round(commission, 2),
+            stamp_duty=round(stamp_duty, 2),
+        )
+        cash += amount - commission - stamp_duty
+        position.long_qty -= quantity
+        if position.long_qty <= 0:
+            position.long_avg_cost = 0.0
+
+        return cash, trade
+
+    def _execute_buy_trade(self, position: Position, cash: float,
+                           fill_price: float, strength: float,
+                           bar: Bar, bars_sorted: list[Bar], idx: int,
+                           sig: Signal) -> tuple[float, Trade | None]:
+        """Execute a BUY order. Returns (updated_cash, trade_or_None)."""
+        actual_price = fill_price * (1 + self.config.slippage)
+        quantity = self._compute_buy_quantity(cash, actual_price, strength)
+        if quantity <= 0:
+            return cash, None
+
+        amount = actual_price * quantity
+        commission = max(amount * self.config.commission_rate,
+                         self.config.min_commission)
+
+        trade = Trade(
+            symbol=bar.symbol, date=bar.date, action="BUY",
+            price=round(actual_price, 2),
+            quantity=quantity,
+            commission=round(commission, 2),
+        )
+        cash -= amount + commission
+
+        # 更新持仓均价
+        total_cost = position.long_avg_cost * position.long_qty + amount
+        position.long_qty += quantity
+        position.long_avg_cost = total_cost / position.long_qty if position.long_qty > 0 else 0
+
+        return cash, trade
 
     def _compute_buy_quantity(self, cash: float, price: float,
                               strength: float) -> int:

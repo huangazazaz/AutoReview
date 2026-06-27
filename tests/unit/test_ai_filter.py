@@ -143,3 +143,129 @@ class TestTradingAgentsWrapper:
         wrapper = TradingAgentsWrapper({"timeout_seconds": 1})
         result = wrapper.analyze("000001", "2024-01-15")
         assert result == "Hold"
+
+
+from datetime import date
+from autotrade.ai.ai_filter import AIFilter
+
+
+def _make_mock_wrapper(decisions: dict):
+    """Create a mock TradingAgentsWrapper that returns predefined decisions."""
+    mock = MagicMock()
+    def analyze(symbol, date_str):
+        key = f"{symbol}|{date_str}"
+        return decisions.get(key, "Hold")
+    mock.analyze = analyze
+    return mock
+
+
+class TestAIFilter:
+    def test_keep_buy_drop_hold_and_sell(self):
+        wrapper = _make_mock_wrapper({
+            "000001|2024-01-15": "Buy",
+            "000002|2024-01-15": "Hold",
+            "000003|2024-01-15": "Sell",
+            "000004|2024-01-15": "Overweight",
+        })
+        cache = LLMCache()
+        ai_filter = AIFilter(wrapper, cache, config={
+            "max_candidates_per_day": 10,
+            "enabled": True,
+        })
+
+        candidates = {
+            date(2024, 1, 15): [
+                ("000001", 0.9, "strong"),
+                ("000002", 0.8, "strong"),
+                ("000003", 0.7, "strong"),
+                ("000004", 0.6, "strong"),
+            ]
+        }
+
+        result = ai_filter.filter(candidates, {})
+        kept = result.get(date(2024, 1, 15), [])
+        kept_symbols = [s for s, _, _ in kept]
+        assert "000001" in kept_symbols      # Buy
+        assert "000004" in kept_symbols      # Overweight
+        assert "000002" not in kept_symbols  # Hold
+        assert "000003" not in kept_symbols  # Sell
+
+    def test_disabled_passthrough(self):
+        wrapper = _make_mock_wrapper({})
+        cache = LLMCache()
+        ai_filter = AIFilter(wrapper, cache, config={
+            "max_candidates_per_day": 10,
+            "enabled": False,
+        })
+
+        candidates = {
+            date(2024, 1, 15): [
+                ("000001", 0.9, "strong"),
+                ("000002", 0.8, "strong"),
+            ]
+        }
+
+        result = ai_filter.filter(candidates, {})
+        assert result == candidates
+
+    def test_respects_max_candidates(self):
+        """Only top N candidates should be analyzed."""
+        analyzed = []
+        mock = MagicMock()
+        def analyze(symbol, date_str):
+            analyzed.append(symbol)
+            return "Buy"
+        mock.analyze = analyze
+
+        cache = LLMCache()
+        ai_filter = AIFilter(mock, cache, config={
+            "max_candidates_per_day": 3,
+            "enabled": True,
+        })
+
+        candidates = {
+            date(2024, 1, 15): [
+                ("A", 0.9, "s"), ("B", 0.8, "s"), ("C", 0.7, "s"),
+                ("D", 0.6, "s"), ("E", 0.5, "s"),
+            ]
+        }
+
+        ai_filter.filter(candidates, {})
+        assert len(analyzed) == 3
+        assert analyzed == ["A", "B", "C"]
+
+    def test_empty_candidates_no_error(self):
+        wrapper = _make_mock_wrapper({})
+        cache = LLMCache()
+        ai_filter = AIFilter(wrapper, cache, config={
+            "max_candidates_per_day": 10,
+            "enabled": True,
+        })
+
+        result = ai_filter.filter({}, {})
+        assert result == {}
+
+    def test_cache_prevents_reanalysis(self):
+        """Cached decisions should not trigger new LLM calls."""
+        analyzed = []
+        mock = MagicMock()
+        def analyze(symbol, date_str):
+            analyzed.append(symbol)
+            return "Buy"
+        mock.analyze = analyze
+
+        cache = LLMCache()
+        cache.set("000001", "2024-01-15", "Buy")  # pre-cached
+
+        ai_filter = AIFilter(mock, cache, config={
+            "max_candidates_per_day": 10,
+            "enabled": True,
+        })
+
+        candidates = {
+            date(2024, 1, 15): [("000001", 0.9, "s")]
+        }
+
+        result = ai_filter.filter(candidates, {})
+        assert len(analyzed) == 0
+        assert len(result[date(2024, 1, 15)]) == 1

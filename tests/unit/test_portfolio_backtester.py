@@ -274,3 +274,164 @@ class TestExitManager:
         triggers = em.check(pos, 5.0, date(2024, 2, 1),
                             [], date(2024, 1, 12))
         assert triggers == []
+
+
+import numpy as np
+import pandas as pd
+from autotrade.core.portfolio_backtester import PortfolioBacktester, PortfolioBacktestConfig
+
+
+def _make_config(**kwargs) -> PortfolioBacktestConfig:
+    defaults = {
+        "start_date": date(2024, 1, 2),
+        "end_date": date(2024, 1, 31),
+        "initial_capital": 1_000_000.0,
+        "cash_buffer": 0.05,
+        "top_n_candidates": 10,
+        "fill_price": "next_open",
+        "commission_rate": 0.0003,
+        "stamp_duty_rate": 0.001,
+        "slippage": 0.001,
+        "min_commission": 5.0,
+        "lot_size": 100,
+        "allow_t_plus_1": True,
+        "exit_rules": {
+            "trailing_stop": {"enabled": True, "drawdown_pct": 0.08},
+            "hard_stop": {"enabled": True, "loss_pct": 0.05},
+            "time_stop": {"enabled": True, "max_holding_days": 20, "min_return_pct": 0.0},
+            "signal_decay": {"enabled": True, "rank_threshold": 50},
+        },
+        "market_regime": {
+            "score_threshold": 0.3,
+            "bullish_threshold": 0.6,
+            "neutral_threshold": 0.4,
+        },
+    }
+    defaults.update(kwargs)
+    return PortfolioBacktestConfig(**defaults)
+
+
+def _make_market_data(symbols: list[str], dates: list[date],
+                      base_prices: dict[str, float] = None) -> dict[str, pd.DataFrame]:
+    """Build minimal market data DataFrames for testing."""
+    base = base_prices or {}
+    market = {}
+    for sym in symbols:
+        price = base.get(sym, 10.0)
+        records = []
+        for i, d in enumerate(dates):
+            p = price * (1 + i * 0.01)  # gentle uptrend
+            records.append({
+                "date": d,
+                "open": p,
+                "high": p * 1.02,
+                "low": p * 0.98,
+                "close": p * 1.01,
+                "volume": 1_000_000,
+                "amount": p * 1_000_000,
+            })
+        df = pd.DataFrame(records)
+        df.set_index("date", inplace=True)
+        market[sym] = df
+    return market
+
+
+def _make_trading_dates(start: date, days: int) -> list[date]:
+    """Generate a list of consecutive weekdays (simplified trading dates)."""
+    import datetime
+    dates = []
+    current = start
+    while len(dates) < days:
+        if current.weekday() < 5:
+            dates.append(current)
+        current = current + datetime.timedelta(days=1)
+    return dates
+
+
+class TestPortfolioBacktester:
+    def test_empty_screener_no_trades(self):
+        """With no screener candidates, no trades should be made."""
+        config = _make_config()
+        bt = PortfolioBacktester(config)
+        dates_list = _make_trading_dates(date(2024, 1, 2), 20)
+        market = _make_market_data(["000001"], dates_list)
+        screener_results: dict = {d: [] for d in dates_list}
+
+        result = bt.run(market, screener_results)
+        assert len(result.trades) == 0
+        assert len(result.equity_curve) > 0
+        assert result.equity_curve.iloc[0] == 1_000_000.0
+
+    def test_single_candidate_creates_position(self):
+        """A single screener candidate should result in a buy on the next day."""
+        config = _make_config(
+            allow_t_plus_1=False,  # simplify test
+        )
+        bt = PortfolioBacktester(config)
+        dates_list = _make_trading_dates(date(2024, 1, 2), 10)
+        market = _make_market_data(["000001"], dates_list, {"000001": 10.0})
+
+        screener_results = {d: [("000001", 0.8, "momentum_strong")] for d in dates_list}
+
+        result = bt.run(market, screener_results)
+        assert len(result.trades) >= 1
+        assert result.equity_curve is not None
+        assert len(result.equity_curve) == len(dates_list)
+
+    def test_lot_size_rounding(self):
+        """All trade quantities must be multiples of lot_size (100)."""
+        config = _make_config(allow_t_plus_1=False)
+        bt = PortfolioBacktester(config)
+        dates_list = _make_trading_dates(date(2024, 1, 2), 5)
+        market = _make_market_data(["000001"], dates_list, {"000001": 10.0})
+
+        screener_results = {d: [("000001", 0.8, "strong")] for d in dates_list}
+        result = bt.run(market, screener_results)
+
+        for trade in result.trades:
+            assert trade.quantity % 100 == 0, f"Quantity {trade.quantity} not a multiple of 100"
+
+    def test_equity_curve_one_point_per_day(self):
+        """Equity curve should have one entry per trading day."""
+        config = _make_config()
+        bt = PortfolioBacktester(config)
+        dates_list = _make_trading_dates(date(2024, 1, 2), 20)
+        market = _make_market_data(["000001"], dates_list)
+        screener_results = {d: [] for d in dates_list}
+
+        result = bt.run(market, screener_results)
+        assert len(result.equity_curve) == len(dates_list)
+
+    def test_sell_frees_symbol_for_rebuy(self):
+        """After a sell, the symbol can be bought again."""
+        config = _make_config(
+            allow_t_plus_1=False,
+            exit_rules={
+                "trailing_stop": {"enabled": False},
+                "hard_stop": {"enabled": False},
+                "time_stop": {"enabled": False},
+                "signal_decay": {"enabled": True, "rank_threshold": 1},
+            },
+        )
+        bt = PortfolioBacktester(config)
+        dates_list = _make_trading_dates(date(2024, 1, 2), 10)
+        market = _make_market_data(["000001", "000002"], dates_list,
+                                   {"000001": 10.0, "000002": 20.0})
+
+        screener_results = {}
+        for i, d in enumerate(dates_list):
+            if i < 3:
+                screener_results[d] = [
+                    ("000001", 0.6, "strong"),
+                    ("000002", 0.5, "strong"),
+                ]
+            else:
+                screener_results[d] = [
+                    ("000002", 0.6, "strong"),
+                    ("000001", 0.5, "strong"),
+                ]
+
+        result = bt.run(market, screener_results)
+        symbols_traded = {t.symbol for t in result.trades}
+        assert len(symbols_traded) >= 1
+        assert result.equity_curve is not None

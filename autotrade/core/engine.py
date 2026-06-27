@@ -505,3 +505,195 @@ def run_screener_backtest(
     summary["screener"] = screener_name
     summary["selection_count"] = len(symbol_to_entry_dates)
     return summary
+
+
+# ---- 组合回测 ----
+
+def _load_portfolio_backtest_config() -> dict:
+    """Load portfolio backtest configuration from YAML."""
+    import yaml
+    cfg_path = (
+        Path(__file__).resolve().parent.parent.parent
+        / "config" / "backtest" / "portfolio.yaml"
+    )
+    if not cfg_path.exists():
+        logger.warning("Portfolio backtest config not found, using defaults")
+        return {}
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    return data.get("portfolio_backtest", {}) or {}
+
+
+def run_portfolio_backtest(
+    screener_name: str = "momentum_screener",
+    start: Optional[date] = None,
+    end: Optional[date] = None,
+    symbols: str | list[str] = "all",
+    datasource_name: str = FAILOVER_NAME,
+    screener_params: dict[str, Any] | None = None,
+    reporter_names: tuple[str, ...] = ("console",),
+) -> dict[str, Any]:
+    """组合级回测: 单账户多持仓 + Screener 每日选股 + 统一出场。
+
+    流程:
+      1. 加载配置 (config/backtest/portfolio.yaml)
+      2. 加载全市场 OHLCV 数据
+      3. 预计算 Screener 每日候选
+      4. 运行 PortfolioBacktester 逐日模拟
+      5. 输出报告
+
+    Args:
+        screener_name: 选股筛选器名称。
+        start/end: 回测区间，None 则从配置读取。
+        symbols: "all" 用全市场，或代码列表。
+        screener_params: Screener 参数覆盖。
+        reporter_names: 报告输出方式。
+
+    Returns:
+        汇总字典。
+    """
+    import json
+    from datetime import datetime as dt
+
+    from autotrade.core.portfolio_backtester import (
+        PortfolioBacktestConfig, PortfolioBacktester,
+    )
+
+    init_registry()
+
+    # ---- 1. 加载配置 ----
+    cfg = _load_portfolio_backtest_config()
+    if not cfg:
+        return {"error": "Portfolio backtest config not found"}
+
+    if start is None:
+        start_str = cfg.get("start_date", "2023-06-27")
+        start = datetime.strptime(start_str, "%Y-%m-%d").date()  # type: ignore[assignment]
+    if end is None:
+        end_str = cfg.get("end_date", "2026-06-18")
+        end = datetime.strptime(end_str, "%Y-%m-%d").date()  # type: ignore[assignment]
+
+    # ---- 2. 解析 symbols + 加载全市场数据 ----
+    resolved = _resolve_symbols(symbols, datasource_name)
+    if not resolved:
+        return {"error": "No symbols to analyze", "results": []}
+
+    # 排除 ST / *ST 股票
+    st_exclude = _load_st_exclusion_set()
+    if st_exclude:
+        resolved = [s for s in resolved if s not in st_exclude]
+        logger.info("排除 ST 后剩余 %d 只", len(resolved))
+    if not resolved:
+        return {"error": "All symbols excluded as ST", "results": []}
+
+    market_data = _load_market_data(resolved, start, end)  # type: ignore[arg-type]
+    if not market_data:
+        return {"error": "No market data loaded", "results": []}
+
+    # 交易日序列
+    all_dates: set[date] = set()
+    for df in market_data.values():
+        for v in df.index:
+            d = v.date() if hasattr(v, "date") else v
+            all_dates.add(d)
+    scan_dates = sorted(d for d in all_dates if start <= d <= end)  # type: ignore[operator]
+
+    # ---- 3. 运行 Screener ----
+    s_params = screener_params
+    if s_params is None:
+        s_params = _load_screener_params(screener_name)
+    top_n = int(cfg.get("top_n_candidates", 50))
+    s_params["top_n_per_day"] = top_n
+    screener_cls = get_screener(screener_name)
+    screener = screener_cls(**s_params)
+    selection = screener.scan(market_data, scan_dates)
+    logger.info("Screener 扫描完成: %d 个交易日有候选", len(selection))
+
+    # ---- 4. 构建回测配置 ----
+    exit_rules = cfg.get("exit_rules", {})
+    market_regime_cfg = cfg.get("market_regime", {})
+
+    bt_config = PortfolioBacktestConfig(
+        start_date=start,  # type: ignore[arg-type]
+        end_date=end,  # type: ignore[arg-type]
+        initial_capital=float(cfg.get("initial_capital", 1_000_000)),
+        cash_buffer=float(cfg.get("cash_buffer", 0.05)),
+        top_n_candidates=top_n,
+        fill_price=str(cfg.get("fill_price", "next_open")),
+        commission_rate=float(cfg.get("commission_rate", 0.0003)),
+        stamp_duty_rate=float(cfg.get("stamp_duty_rate", 0.001)),
+        slippage=float(cfg.get("slippage", 0.001)),
+        min_commission=float(cfg.get("min_commission", 5.0)),
+        lot_size=int(cfg.get("lot_size", 100)),
+        allow_t_plus_1=bool(cfg.get("allow_t_plus_1", True)),
+        exit_rules=exit_rules,
+        market_regime=market_regime_cfg,
+    )
+
+    # ---- 5. 运行组合回测 ----
+    backtester = PortfolioBacktester(bt_config)
+    result = backtester.run(market_data, selection)
+
+    logger.info(
+        "组合回测完成: %d 笔交易, 收益率 %.2f%%, 最大回撤 %.2f%%, 夏普 %.4f",
+        len(result.trades),
+        result.metrics.get("total_return_pct", 0.0),
+        result.metrics.get("max_drawdown_pct", 0.0),
+        result.metrics.get("sharpe_ratio", 0.0),
+    )
+
+    # ---- 6. 输出报告 ----
+    for rep_name in reporter_names:
+        try:
+            reporter_cls = get_reporter(rep_name)
+            reporter = reporter_cls() if isinstance(reporter_cls, type) else reporter_cls
+            if hasattr(reporter, "render_portfolio"):
+                reporter.render_portfolio(result, bt_config)
+            else:
+                logger.info("Reporter '%s' does not support portfolio results", rep_name)
+        except Exception as e:
+            logger.error("Reporter '%s' failed: %s", rep_name, e)
+
+    # ---- 7. 保存结果 ----
+    output_dir = Path(cfg.get("output_dir", "data/results"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
+    prefix = cfg.get("output_prefix", "portfolio_backtest")
+    run_dir = output_dir / f"{prefix}_{timestamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save equity curve
+    if result.equity_curve is not None:
+        result.equity_curve.to_csv(run_dir / "equity_curve.csv", header=["equity"])
+
+    # Save trades
+    if result.trades:
+        trades_df = pd.DataFrame([
+            {
+                "symbol": t.symbol,
+                "buy_date": t.buy_date,
+                "sell_date": t.sell_date,
+                "buy_price": t.buy_price,
+                "sell_price": t.sell_price,
+                "quantity": t.quantity,
+                "pnl": t.pnl,
+                "pnl_pct": t.pnl_pct,
+            }
+            for t in result.trades
+        ])
+        trades_df.to_csv(run_dir / "trades.csv", index=False)
+
+    # Save summary
+    with open(run_dir / "summary.json", "w", encoding="utf-8") as f:
+        json.dump(result.metrics, f, ensure_ascii=False, indent=2)
+
+    print(f"\n结果已保存到: {run_dir}")
+    print(f"  权益曲线: {run_dir / 'equity_curve.csv'}")
+    print(f"  交易明细: {run_dir / 'trades.csv'}")
+    print(f"  汇总指标: {run_dir / 'summary.json'}")
+
+    return {
+        "metrics": result.metrics,
+        "trade_count": len(result.trades),
+        "output_dir": str(run_dir),
+    }

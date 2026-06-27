@@ -1,0 +1,52 @@
+# Portfolio Backtest Configuration
+# 组合级回测 — 单账户多持仓 + Screener 入场 + 统一出场
+
+portfolio_backtest:
+  # 回测时间区间
+  start_date: "2023-06-27"
+  end_date: "2026-06-18"
+
+  # 资金
+  initial_capital: 1_000_000.0
+  cash_buffer: 0.05              # 保留 5% 现金缓冲
+
+  # 选股
+  screener: "momentum_screener"  # 使用的筛选器名称
+  screener_params: {}            # 覆盖筛选器参数 (可选)
+  top_n_candidates: 50           # 每日考虑的候选股数量上限
+
+  # 市场环境判断 (基于筛选器输出广度)
+  market_regime:
+    score_threshold: 0.3         # 最低分阈值
+    bullish_threshold: 0.6       # 平均分 >= 0.6 → 最多持仓 3 支
+    neutral_threshold: 0.4       # 平均分 >= 0.4 → 最多持仓 2 支
+    # 否则 → 最多持仓 1 支
+
+  # 统一出场规则
+  exit_rules:
+    trailing_stop:
+      enabled: true
+      drawdown_pct: 0.08         # 从持仓最高点回撤 8% → 卖出
+    time_stop:
+      enabled: true
+      max_holding_days: 20       # 持有 20 个交易日后
+      min_return_pct: 0.0        # …如果收益低于 0% → 卖出
+    hard_stop:
+      enabled: true
+      loss_pct: 0.05             # 亏损超过 5% → 立即卖出
+    signal_decay:
+      enabled: true
+      rank_threshold: 50         # 跌出筛选器 top 50 → 卖出
+
+  # 交易成本 (A 股规则)
+  fill_price: "next_open"
+  commission_rate: 0.0003        # 万三
+  stamp_duty_rate: 0.001         # 千一 (仅卖出)
+  slippage: 0.001               # 千一
+  min_commission: 5.0            # 最低 5 元
+  lot_size: 100                  # 一手 100 股
+  allow_t_plus_1: true           # T+1 制度
+
+  # 输出
+  output_dir: "data/results"
+  output_prefix: "portfolio_backtest"

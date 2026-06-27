@@ -195,6 +195,50 @@ def show(result: str):
         click.echo(f"  {key}: {val}")
 
 
+@cli.command("portfolio-backtest")
+@click.option("--screener", "-s", default="momentum_screener",
+              help="选股筛选器名称")
+@click.option("--start", default=None, help="开始日期 YYYY-MM-DD（默认从配置读取）")
+@click.option("--end", default=None, help="结束日期 YYYY-MM-DD（默认从配置读取）")
+@click.option("--symbols", default="all", help="股票代码列表，'all' 表示全市场")
+@click.option("--reporter", "-r", "reporters", multiple=True,
+              default=["console", "plot"],
+              help="报告输出方式 (console, csv, plot)")
+@click.pass_context
+def portfolio_backtest_cmd(ctx, screener, start, end, symbols, reporters):
+    """组合级回测: 单账户多持仓 + 每日选股 + 统一出场。
+
+    基于 config/backtest/portfolio.yaml 配置，从全市场筛选候选股，
+    按信号强度分仓买入，统一出场规则管理风险。
+    """
+    from autotrade.core.engine import run_portfolio_backtest
+
+    start_date = _parse_date(start)
+    end_date = _parse_date(end)
+
+    click.echo(f"\n{'='*60}")
+    click.echo(f"  组合回测")
+    click.echo(f"  筛选器: {screener}")
+    click.echo(f"  区间: {start or '从配置读取'} → {end or '从配置读取'}")
+    click.echo(f"  股票池: {symbols}")
+    click.echo(f"{'='*60}\n")
+
+    result = run_portfolio_backtest(
+        screener_name=screener,
+        start=start_date,
+        end=end_date,
+        symbols=symbols,
+        reporter_names=tuple(reporters),
+    )
+
+    if "error" in result:
+        click.echo(f"\n  ✗ 回测失败: {result['error']}", err=True)
+    else:
+        click.echo(f"\n  ✓ 回测完成")
+        if "output_dir" in result:
+            click.echo(f"  结果目录: {result['output_dir']}")
+
+
 def _parse_date(date_str: Optional[str]) -> Optional[date]:
     """解析日期字符串。"""
     if not date_str:

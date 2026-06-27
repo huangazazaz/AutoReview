@@ -83,3 +83,83 @@ class PlotReporter(Reporter):
             plt.close()
 
         return filepath
+
+    def render_portfolio(self, result, config=None):
+        """Render portfolio backtest results with equity curve chart."""
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+        from datetime import datetime
+        from pathlib import Path
+
+        if result.equity_curve is None or result.equity_curve.empty:
+            print("No equity curve to plot.")
+            return
+
+        fig, axes = plt.subplots(3, 1, figsize=(14, 12),
+                                 gridspec_kw={"height_ratios": [3, 1, 1]})
+
+        # 1. Equity curve
+        ax1 = axes[0]
+        eq = result.equity_curve
+        ax1.plot(eq.index, eq.values, color="#1f77b4", linewidth=1.2, label="Equity")
+        ax1.axhline(y=eq.iloc[0], color="gray", linestyle="--", alpha=0.5, label="Initial")
+        ax1.fill_between(eq.index, eq.iloc[0], eq.values,
+                         where=eq.values >= eq.iloc[0],
+                         color="green", alpha=0.1)
+        ax1.fill_between(eq.index, eq.values, eq.iloc[0],
+                         where=eq.values < eq.iloc[0],
+                         color="red", alpha=0.1)
+        ax1.set_ylabel("Account Equity (¥)")
+        ax1.set_title("Portfolio Backtest — Equity Curve", fontsize=13, fontweight="bold")
+        ax1.legend(loc="upper left")
+        ax1.grid(True, alpha=0.3)
+        ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+        plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha="right")
+
+        # 2. Drawdown
+        ax2 = axes[1]
+        peak = eq.cummax()
+        drawdown = (eq - peak) / peak * 100
+        ax2.fill_between(eq.index, 0, drawdown.values, color="red", alpha=0.3)
+        ax2.plot(eq.index, drawdown.values, color="red", linewidth=0.8)
+        ax2.set_ylabel("Drawdown (%)")
+        ax2.grid(True, alpha=0.3)
+        ax2.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+        plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha="right")
+
+        # 3. Daily returns
+        ax3 = axes[2]
+        daily_ret = eq.pct_change() * 100
+        colors = ["green" if v >= 0 else "red" for v in daily_ret.values]
+        ax3.bar(eq.index[1:], daily_ret.values[1:], color=colors, width=1, alpha=0.6)
+        ax3.set_ylabel("Daily Return (%)")
+        ax3.set_xlabel("Date")
+        ax3.grid(True, alpha=0.3)
+        ax3.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+        plt.setp(ax3.xaxis.get_majorticklabels(), rotation=45, ha="right")
+
+        plt.tight_layout()
+
+        # Save
+        os.makedirs(self.output_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = os.path.join(self.output_dir, f"portfolio_equity_{timestamp}.png")
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        print(f"  Chart saved to: {save_path}")
+
+        if self.show:
+            plt.show()
+        else:
+            plt.close()
+
+        # Print metrics summary
+        metrics = result.metrics
+        if metrics:
+            print("\n  ── Performance Metrics ──")
+            print(f"  Initial Capital:  ¥{metrics.get('initial_capital', 0):,.0f}")
+            print(f"  Final Equity:     ¥{metrics.get('final_equity', 0):,.0f}")
+            print(f"  Total Return:     {metrics.get('total_return_pct', 0):.2f}%")
+            print(f"  Win Rate:         {metrics.get('win_rate', 0):.2f}%")
+            print(f"  Max Drawdown:     {metrics.get('max_drawdown_pct', 0):.2f}%")
+            print(f"  Sharpe Ratio:     {metrics.get('sharpe_ratio', 0):.4f}")
+            print(f"  Total Trades:     {metrics.get('total_trades', 0)}")

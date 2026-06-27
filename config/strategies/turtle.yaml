@@ -1,0 +1,40 @@
+# Turtle Trading Strategy — 海龟交易策略
+#
+# 经典趋势跟踪策略，基于波动率标准化仓位的机械化交易系统。
+# 双系统（短期20日 + 长期55日）同时监控，做多/做空双向参与。
+#
+# 核心机制:
+#   N值 = 20日ATR（真实波幅）
+#   1 Unit = 账户1% / (N × 每点价值)  ← 波动率标准化仓位
+#   加仓 = 每0.5N有利移动加1 Unit，最多4 Unit
+#   止损 = 最后入场价 ± 2N
+#
+strategy: turtle
+params:
+  # ---- 系统参数 ----
+  system1_entry: 20          # 系统一入场: 突破20日最高/最低
+  system1_exit: 10           # 系统一离场: 反向突破10日最低/最高
+  system2_entry: 55          # 系统二入场: 突破55日最高/最低
+  system2_exit: 20           # 系统二离场: 反向突破20日最低/最高
+  use_system1: true          # 启用系统一（短期）
+  use_system2: true          # 启用系统二（长期）
+
+  # ---- 波动率 ----
+  atr_period: 20             # N值周期（标准海龟用20）
+
+  # ---- 仓位 ----
+  account_risk_pct: 0.01     # 每Unit风险 = 账户的1%
+  max_units: 4               # 单品种最大4个Unit
+
+  # ---- 加仓 ----
+  pyramid_atr_mult: 0.5      # 每0.5N加一次仓
+
+  # ---- 止损 ----
+  stop_atr_mult: 2.0         # 2N硬止损
+
+  # ---- 方向 ----
+  allow_long: true           # 允许做多
+  allow_short: true          # 允许做空
+
+  # ---- 系统一过滤器 ----
+  skip_if_last_win_sys1: true  # 上一次系统一盈利则跳过下次信号

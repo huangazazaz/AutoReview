@@ -65,34 +65,47 @@ class Backtester:
             today = bar.date
             daily_signals = signal_map.get(today, [])
 
-            # --- Phase 1: Process SELL signals (exit longs first) ---
+            # --- Phase 1: Process exits (SELL + BUY_TO_COVER) ---
             for sig in daily_signals:
-                if sig.action != "SELL":
-                    continue
-                if not self._can_sell_today(can_sell_after, today):
-                    continue
-                fill_price = self._get_fill_price(sig, bar, bars_sorted, i, is_buy=False)
-                if fill_price is None:
-                    continue
-                cash, trade = self._execute_sell_trade(position, cash, fill_price,
-                                                       sig.strength, bar, sig)
-                if trade:
-                    trades.append(trade)
+                if sig.action == "SELL":
+                    if not self._can_sell_today(can_sell_after, today):
+                        continue
+                    fill_price = self._get_fill_price(sig, bar, bars_sorted, i, is_buy=False)
+                    if fill_price is None:
+                        continue
+                    cash, trade = self._execute_sell_trade(position, cash, fill_price,
+                                                           sig.strength, bar, sig)
+                    if trade:
+                        trades.append(trade)
+                elif sig.action == "BUY_TO_COVER":
+                    fill_price = self._get_fill_price(sig, bar, bars_sorted, i, is_buy=False)
+                    if fill_price is None:
+                        continue
+                    cash, trade = self._execute_cover_trade(position, cash, fill_price,
+                                                            sig.strength, bar)
+                    if trade:
+                        trades.append(trade)
 
-            # --- Phase 2: Process BUY signals (enter longs after exits) ---
+            # --- Phase 2: Process entries (BUY + SELL_SHORT) ---
             for sig in daily_signals:
-                if sig.action != "BUY":
-                    continue
-                fill_price = self._get_fill_price(sig, bar, bars_sorted, i, is_buy=True)
-                if fill_price is None:
-                    continue
-                cash, trade = self._execute_buy_trade(position, cash, fill_price,
-                                                      sig.strength, bar, bars_sorted, i, sig)
-                if trade:
-                    trades.append(trade)
-                    # T+1 锁定
-                    if self.config.allow_t_plus_1 and i + 1 < len(bars_sorted):
-                        can_sell_after = bars_sorted[i + 1].date
+                if sig.action == "BUY":
+                    fill_price = self._get_fill_price(sig, bar, bars_sorted, i, is_buy=True)
+                    if fill_price is None:
+                        continue
+                    cash, trade = self._execute_buy_trade(position, cash, fill_price,
+                                                          sig.strength, bar, bars_sorted, i, sig)
+                    if trade:
+                        trades.append(trade)
+                        if self.config.allow_t_plus_1 and i + 1 < len(bars_sorted):
+                            can_sell_after = bars_sorted[i + 1].date
+                elif sig.action == "SELL_SHORT" and self.config.allow_short:
+                    fill_price = self._get_fill_price(sig, bar, bars_sorted, i, is_buy=False)
+                    if fill_price is None:
+                        continue
+                    cash, trade = self._execute_short_trade(position, cash, fill_price,
+                                                            sig.strength, bar)
+                    if trade:
+                        trades.append(trade)
 
             # 更新市值的每日估值
             long_market_value = position.long_qty * bar.close
@@ -187,6 +200,80 @@ class Backtester:
         total_cost = position.long_avg_cost * position.long_qty + amount
         position.long_qty += quantity
         position.long_avg_cost = total_cost / position.long_qty if position.long_qty > 0 else 0
+
+        return cash, trade
+
+    def _execute_short_trade(self, position: Position, cash: float,
+                             fill_price: float, strength: float,
+                             bar: Bar) -> tuple[float, Trade | None]:
+        """Execute a SELL_SHORT order. Returns (updated_cash, trade_or_None)."""
+        actual_price = fill_price * (1 - self.config.slippage)
+        quantity = self._compute_buy_quantity(cash, actual_price, strength)
+        if quantity <= 0:
+            return cash, None
+
+        # Margin check: required = new_short_value * margin_ratio
+        new_short_value = actual_price * quantity
+        required_margin = new_short_value * self.config.short_margin_ratio
+        existing_margin = (position.short_qty * position.short_avg_cost *
+                          self.config.short_margin_ratio) if position.short_qty > 0 else 0
+        available_margin = cash - existing_margin
+        if available_margin < required_margin:
+            return cash, None  # Insufficient margin
+
+        amount = new_short_value
+        commission = max(amount * self.config.commission_rate,
+                         self.config.min_commission)
+
+        trade = Trade(
+            symbol=bar.symbol, date=bar.date, action="SELL_SHORT",
+            price=round(actual_price, 2),
+            quantity=quantity,
+            commission=round(commission, 2),
+        )
+        # Short sale proceeds increase cash (margin is locked conceptually)
+        cash += amount - commission
+
+        # Update short position
+        total_cost = position.short_avg_cost * position.short_qty + amount
+        position.short_qty += quantity
+        position.short_avg_cost = total_cost / position.short_qty if position.short_qty > 0 else 0
+
+        return cash, trade
+
+    def _execute_cover_trade(self, position: Position, cash: float,
+                             fill_price: float, strength: float,
+                             bar: Bar) -> tuple[float, Trade | None]:
+        """Execute a BUY_TO_COVER order. Returns (updated_cash, trade_or_None)."""
+        if position.short_qty <= 0:
+            return cash, None
+
+        actual_price = fill_price * (1 + self.config.slippage)
+
+        # Compute cover quantity
+        if self.config.position_sizing == "strength":
+            quantity = int(position.short_qty * strength)
+        else:
+            quantity = position.short_qty
+        quantity = (quantity // self.config.lot_size) * self.config.lot_size
+        if quantity <= 0:
+            return cash, None
+
+        amount = actual_price * quantity
+        commission = max(amount * self.config.commission_rate,
+                         self.config.min_commission)
+
+        trade = Trade(
+            symbol=bar.symbol, date=bar.date, action="BUY_TO_COVER",
+            price=round(actual_price, 2),
+            quantity=quantity,
+            commission=round(commission, 2),
+        )
+        cash -= amount + commission
+
+        position.short_qty -= quantity
+        if position.short_qty <= 0:
+            position.short_avg_cost = 0.0
 
         return cash, trade
 

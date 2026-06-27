@@ -77,3 +77,69 @@ class TestLLMCache:
         cache.set("000001", "2024-01-15", "Buy")
         cache.set("000001", "2024-01-15", "Sell")  # overwrite
         assert cache.get("000001", "2024-01-15") == "Sell"
+
+
+from unittest.mock import patch, MagicMock
+from autotrade.ai.trading_agents_wrapper import TradingAgentsWrapper
+
+
+class TestTradingAgentsWrapper:
+    def test_init_creates_config(self):
+        config = {
+            "llm_provider": "deepseek",
+            "deep_think_llm": "deepseek-chat",
+            "quick_think_llm": "deepseek-chat",
+            "max_debate_rounds": 1,
+            "timeout_seconds": 120,
+        }
+        wrapper = TradingAgentsWrapper(config)
+        assert wrapper.llm_provider == "deepseek"
+        assert wrapper.timeout == 120
+
+    def test_lazy_init_graph(self):
+        """Graph should not be created until first analyze call."""
+        wrapper = TradingAgentsWrapper({})
+        assert wrapper._graph is None
+
+    @patch("tradingagents.graph.trading_graph.TradingAgentsGraph")
+    def test_analyze_returns_buy(self, mock_graph_class):
+        """Mocked TradingAgents returns 'Buy'."""
+        mock_graph = MagicMock()
+        mock_graph.propagate.return_value = ({}, "Buy")
+        mock_graph_class.return_value = mock_graph
+
+        wrapper = TradingAgentsWrapper({})
+        result = wrapper.analyze("000001", "2024-01-15")
+        assert result == "Buy"
+        mock_graph.propagate.assert_called_once_with("000001.SZ", "2024-01-15")
+
+    @patch("tradingagents.graph.trading_graph.TradingAgentsGraph")
+    def test_analyze_handles_sell(self, mock_graph_class):
+        mock_graph = MagicMock()
+        mock_graph.propagate.return_value = ({}, "Sell")
+        mock_graph_class.return_value = mock_graph
+
+        wrapper = TradingAgentsWrapper({})
+        result = wrapper.analyze("600519", "2024-06-15")
+        assert result == "Sell"
+        mock_graph.propagate.assert_called_once_with("600519.SS", "2024-06-15")
+
+    @patch("tradingagents.graph.trading_graph.TradingAgentsGraph")
+    def test_analyze_error_returns_hold(self, mock_graph_class):
+        mock_graph = MagicMock()
+        mock_graph.propagate.side_effect = RuntimeError("API error")
+        mock_graph_class.return_value = mock_graph
+
+        wrapper = TradingAgentsWrapper({})
+        result = wrapper.analyze("000001", "2024-01-15")
+        assert result == "Hold"
+
+    @patch("tradingagents.graph.trading_graph.TradingAgentsGraph")
+    def test_analyze_timeout_returns_hold(self, mock_graph_class):
+        mock_graph = MagicMock()
+        mock_graph.propagate.side_effect = TimeoutError("timeout")
+        mock_graph_class.return_value = mock_graph
+
+        wrapper = TradingAgentsWrapper({"timeout_seconds": 1})
+        result = wrapper.analyze("000001", "2024-01-15")
+        assert result == "Hold"

@@ -69,3 +69,38 @@ class TestAccount:
         acct.positions["000001"] = pos
         acct.record_equity(date(2024, 1, 10), {"000001": 12.0})
         assert acct.equity_curve[0][1] == 620000.0
+
+
+from autotrade.core.market_regime import MarketRegime
+
+
+class TestMarketRegime:
+    def test_empty_candidates_returns_zero(self):
+        mr = MarketRegime()
+        assert mr.detect([]) == 0
+
+    def test_bullish_returns_3(self):
+        mr = MarketRegime(bullish_threshold=0.6)
+        candidates = [("A", 0.9, "strong"), ("B", 0.8, "strong"), ("C", 0.7, "strong")]
+        assert mr.detect(candidates) == 3
+
+    def test_neutral_returns_2(self):
+        mr = MarketRegime(neutral_threshold=0.4, bullish_threshold=0.6)
+        candidates = [("A", 0.5, "steady"), ("B", 0.45, "steady")]
+        assert mr.detect(candidates) == 2
+
+    def test_bearish_returns_1(self):
+        mr = MarketRegime(neutral_threshold=0.4)
+        candidates = [("A", 0.35, "weak"), ("B", 0.3, "weak")]
+        assert mr.detect(candidates) == 1
+
+    def test_scores_below_threshold_excluded(self):
+        mr = MarketRegime(score_threshold=0.3, neutral_threshold=0.4, bullish_threshold=0.6)
+        # Only one candidate above score_threshold (0.3), avg=0.5 → neutral → 2
+        candidates = [("A", 0.5, "steady"), ("B", 0.2, "weak"), ("C", 0.1, "weak")]
+        assert mr.detect(candidates) == 2
+
+    def test_all_below_threshold_returns_1(self):
+        mr = MarketRegime(score_threshold=0.3)
+        candidates = [("A", 0.2, "weak"), ("B", 0.1, "weak")]
+        assert mr.detect(candidates) == 1

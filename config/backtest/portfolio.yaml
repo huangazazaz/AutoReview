@@ -50,3 +50,14 @@ portfolio_backtest:
   # 输出
   output_dir: "data/results"
   output_prefix: "portfolio_backtest"
+
+  # AI 增强筛选 (基于 TradingAgents 多智能体分析)
+  ai_filter:
+    enabled: false                  # 启用 AI 二次过滤（需要 DEEPSEEK_API_KEY）
+    max_candidates_per_day: 10      # 每天最多分析多少只候选股
+    llm_provider: "deepseek"        # LLM 供应商
+    deep_think_llm: "deepseek-chat" # 深度推理模型
+    quick_think_llm: "deepseek-chat"# 快速推理模型
+    max_debate_rounds: 1            # 牛熊辩论轮数
+    timeout_seconds: 120            # 单次分析超时（秒）
+    cache_dir: "data/cache/llm"     # LLM 决策缓存目录

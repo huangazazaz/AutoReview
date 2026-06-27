@@ -609,6 +609,32 @@ def run_portfolio_backtest(
     selection = screener.scan(market_data, scan_dates)
     logger.info("Screener 扫描完成: %d 个交易日有候选", len(selection))
 
+    # ---- 3b. AI 二次过滤 ----
+    ai_cfg = cfg.get("ai_filter", {})
+    if ai_cfg.get("enabled", False):
+        from autotrade.ai.ai_filter import AIFilter
+        from autotrade.ai.llm_cache import LLMCache
+        from autotrade.ai.trading_agents_wrapper import TradingAgentsWrapper
+
+        logger.info("初始化 AI 过滤器 (provider=%s)...", ai_cfg.get("llm_provider"))
+        llm_cache = LLMCache(cache_dir=ai_cfg.get("cache_dir", "data/cache/llm"))
+        llm_cache.load_from_disk()
+        wrapper = TradingAgentsWrapper(ai_cfg)
+        ai_filter = AIFilter(wrapper, llm_cache, ai_cfg)
+
+        logger.info("AI 过滤中...")
+        pre_count = sum(len(v) for v in selection.values())
+        selection = ai_filter.filter(selection, market_data)
+        post_count = sum(len(v) for v in selection.values())
+        logger.info(
+            "AI 过滤完成: %d → %d 候选 (%.1f%%)",
+            pre_count, post_count,
+            (post_count / pre_count * 100) if pre_count > 0 else 0,
+        )
+        llm_cache.save_to_disk()
+    else:
+        logger.info("AI 过滤器已禁用")
+
     # ---- 4. 构建回测配置 ----
     exit_rules = cfg.get("exit_rules", {})
     market_regime_cfg = cfg.get("market_regime", {})

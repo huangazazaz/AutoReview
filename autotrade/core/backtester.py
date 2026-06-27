@@ -309,30 +309,41 @@ class Backtester:
     def _split_cycles(trades: list) -> list[tuple[list, list]]:
         """将交易列表按持仓周期拆分。每轮从空仓到再次空仓为一个周期。
 
+        处理多空双向：分别跟踪多头净持仓和空头净持仓。
+
         Returns:
-            [(buys, sells), ...]  最后一个周期可能只有 buys（未平仓）。
+            [(entries, exits), ...]
+            最后一个周期可能只有开仓交易（未平仓）。
         """
         cycles: list[tuple[list, list]] = []
-        current_buys: list = []
-        current_sells: list = []
-        position = 0
+        current_entries: list = []
+        current_exits: list = []
+        long_position = 0
+        short_position = 0
 
         for t in trades:
             if t.action == "BUY":
-                current_buys.append(t)
-                position += t.quantity
-            else:
-                current_sells.append(t)
-                position -= t.quantity
+                current_entries.append(t)
+                long_position += t.quantity
+            elif t.action == "SELL":
+                current_exits.append(t)
+                long_position -= t.quantity
+            elif t.action == "SELL_SHORT":
+                current_entries.append(t)
+                short_position += t.quantity
+            elif t.action == "BUY_TO_COVER":
+                current_exits.append(t)
+                short_position -= t.quantity
 
-            if position == 0 and current_buys:
-                cycles.append((current_buys, current_sells))
-                current_buys = []
-                current_sells = []
+            # Cycle ends when both long and short are fully closed
+            if long_position == 0 and short_position == 0 and current_entries:
+                cycles.append((current_entries, current_exits))
+                current_entries = []
+                current_exits = []
 
-        # 未平仓周期
-        if current_buys:
-            cycles.append((current_buys, current_sells))
+        # Unclosed cycle
+        if current_entries:
+            cycles.append((current_entries, current_exits))
 
         return cycles
 
@@ -340,7 +351,7 @@ class Backtester:
     def _compute_metrics(self, trades: list[Trade],
                          equity_series: list[float],
                          dates: list[date]) -> dict:
-        """计算回测汇总指标。"""
+        """计算回测汇总指标（向量化）。"""
         if not trades or len(equity_series) < 2:
             return {
                 "total_trades": len(trades),
@@ -354,10 +365,7 @@ class Backtester:
         final_equity = equity_series[-1]
         total_return_pct = (final_equity - initial_capital) / initial_capital * 100
 
-        # 胜率：按持仓周期计算（一轮完整建仓→清仓为一个周期）
-        # 用加权均价对比：加权卖出均价 > 加权买入均价 → 赢
-        buy_trades = [t for t in trades if t.action == "BUY"]
-        sell_trades = [t for t in trades if t.action == "SELL"]
+        # 胜率：按持仓周期计算
         wins = 0
         cycles = self._split_cycles(trades)
         for buys, sells in cycles:
@@ -375,28 +383,30 @@ class Backtester:
         total_cycles = len(cycles) - (1 if cycles and not cycles[-1][1] else 0)
         win_rate = (wins / total_cycles * 100) if total_cycles > 0 else 0.0
 
-        # 最大回撤
+        # 最大回撤（向量化）
         equity_arr = np.array(equity_series)
         peak = np.maximum.accumulate(equity_arr)
-        drawdown = (peak - equity_arr) / peak * 100
-        max_drawdown_pct = -float(np.max(drawdown))  # 负数表示亏损
+        drawdown_pct = (equity_arr - peak) / peak
+        max_drawdown_pct = float(np.min(drawdown_pct) * 100)
 
-        # 夏普比率（简化：用日收益率，无风险利率=0）
-        if len(equity_series) > 1:
-            returns = pd.Series(equity_series).pct_change().dropna()
-            if returns.std() > 0:
-                sharpe = float(returns.mean() / returns.std() * np.sqrt(252))
-            else:
-                sharpe = 0.0
+        # 夏普比率（向量化）
+        returns = np.diff(equity_arr) / equity_arr[:-1]
+        if len(returns) > 1:
+            mean_ret = np.mean(returns)
+            std_ret = np.std(returns, ddof=1)
+            sharpe = float(mean_ret / std_ret * np.sqrt(252)) if std_ret > 0 else 0.0
         else:
             sharpe = 0.0
+
+        buy_trades = sum(1 for t in trades if t.action == "BUY")
+        sell_trades = sum(1 for t in trades if t.action in ("SELL", "BUY_TO_COVER"))
 
         return {
             "initial_capital": initial_capital,
             "final_equity": round(final_equity, 2),
             "total_trades": len(trades),
-            "buy_trades": len(buy_trades),
-            "sell_trades": len(sell_trades),
+            "buy_trades": buy_trades,
+            "sell_trades": sell_trades,
             "total_return_pct": round(total_return_pct, 2),
             "win_rate": round(win_rate, 2),
             "max_drawdown_pct": round(max_drawdown_pct, 2),

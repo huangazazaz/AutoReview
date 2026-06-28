@@ -531,6 +531,9 @@ def run_portfolio_backtest(
     symbols: str | list[str] = "all",
     datasource_name: str = FAILOVER_NAME,
     screener_params: dict[str, Any] | None = None,
+    strategy_name: str | None = None,
+    strategy_params: dict[str, Any] | None = None,
+    strategy_buy_window: int = 1,
     reporter_names: tuple[str, ...] = ("console",),
 ) -> dict[str, Any]:
     """组合级回测: 单账户多持仓 + Screener 每日选股 + 统一出场。
@@ -539,14 +542,19 @@ def run_portfolio_backtest(
       1. 加载配置 (config/backtest/portfolio.yaml)
       2. 加载全市场 OHLCV 数据
       3. 预计算 Screener 每日候选
-      4. 运行 PortfolioBacktester 逐日模拟
-      5. 输出报告
+      4. (可选) 构建策略信号缓存
+      5. 运行 PortfolioBacktester 逐日模拟
+      6. 输出报告
 
     Args:
         screener_name: 选股筛选器名称。
         start/end: 回测区间，None 则从配置读取。
         symbols: "all" 用全市场，或代码列表。
+        datasource_name: 数据源名。
         screener_params: Screener 参数覆盖。
+        strategy_name: 策略名 (如 "turtle")。None = 纯 Screener 模式。
+        strategy_params: 策略参数覆盖。
+        strategy_buy_window: 策略 BUY 信号匹配窗口 (天)。
         reporter_names: 报告输出方式。
 
     Returns:
@@ -614,14 +622,28 @@ def run_portfolio_backtest(
     if ai_cfg.get("enabled", False):
         from autotrade.ai.ai_filter import AIFilter
         from autotrade.ai.llm_cache import LLMCache
-        from autotrade.ai.trading_agents_wrapper import TradingAgentsWrapper
 
-        logger.info("初始化 AI 过滤器 (provider=%s)...", ai_cfg.get("llm_provider"))
+        logger.info("初始化 AI 过滤器...")
         llm_cache = LLMCache(cache_dir=ai_cfg.get("cache_dir", "data/cache/llm"))
         llm_cache.load_from_disk()
-        wrapper = TradingAgentsWrapper(ai_cfg)
-        ai_filter = AIFilter(wrapper, llm_cache, ai_cfg)
 
+        use_local = ai_cfg.get("use_local_analyzer", True)
+        analyzer = None
+        if use_local:
+            import os
+            api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+            if api_key:
+                from autotrade.ai.local_ai_analyzer import LocalAIAnalyzer
+                logger.info("使用 LocalAIAnalyzer (本地数据 + DeepSeek)")
+                analyzer = LocalAIAnalyzer(api_key=api_key)
+            else:
+                logger.warning("DEEPSEEK_API_KEY 未设置，尝试 TradingAgents")
+        if analyzer is None:
+            from autotrade.ai.trading_agents_wrapper import TradingAgentsWrapper
+            logger.info("使用 TradingAgentsWrapper")
+            analyzer = TradingAgentsWrapper(ai_cfg)
+
+        ai_filter = AIFilter(analyzer, llm_cache, ai_cfg)
         logger.info("AI 过滤中...")
         pre_count = sum(len(v) for v in selection.values())
         selection = ai_filter.filter(selection, market_data)
@@ -634,6 +656,30 @@ def run_portfolio_backtest(
         llm_cache.save_to_disk()
     else:
         logger.info("AI 过滤器已禁用")
+
+    # ---- 3c. 构建策略信号缓存 ----
+    signal_cache = None
+    if strategy_name:
+        from autotrade.core.strategy_signal_cache import StrategySignalCache
+
+        strategy_cls = get_strategy(strategy_name)
+        if strategy_cls is None:
+            logger.error("策略 '%s' 未注册", strategy_name)
+            return {"error": f"Strategy '{strategy_name}' not found"}
+
+        sp = strategy_params
+        if sp is None:
+            sp = get_strategy_params(strategy_name).get("params", {}) or {}
+        strategy = _instantiate_strategy(strategy_cls, sp)
+
+        logger.info("构建策略信号缓存 (策略=%s, 股票数=%d)...",
+                    strategy_name, len(market_data))
+        try:
+            signal_cache = StrategySignalCache(strategy, market_data)
+            logger.info("策略信号缓存构建完成: %d 只股票有信号", len(signal_cache))
+        except Exception as e:
+            logger.error("构建策略信号缓存失败: %s", e)
+            return {"error": f"Strategy signal cache build failed: {e}"}
 
     # ---- 4. 构建回测配置 ----
     exit_rules = cfg.get("exit_rules", {})
@@ -654,11 +700,14 @@ def run_portfolio_backtest(
         allow_t_plus_1=bool(cfg.get("allow_t_plus_1", True)),
         exit_rules=exit_rules,
         market_regime=market_regime_cfg,
+        strategy_name=strategy_name,
+        strategy_params=strategy_params,
+        strategy_buy_window=strategy_buy_window,
     )
 
     # ---- 5. 运行组合回测 ----
     backtester = PortfolioBacktester(bt_config)
-    result = backtester.run(market_data, selection)
+    result = backtester.run(market_data, selection, signal_cache=signal_cache)
 
     logger.info(
         "组合回测完成: %d 笔交易, 收益率 %.2f%%, 最大回撤 %.2f%%, 夏普 %.4f",
@@ -704,6 +753,7 @@ def run_portfolio_backtest(
                 "quantity": t.quantity,
                 "pnl": t.pnl,
                 "pnl_pct": t.pnl_pct,
+                "trigger": t.trigger,
             }
             for t in result.trades
         ])

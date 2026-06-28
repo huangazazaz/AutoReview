@@ -611,7 +611,11 @@ def run_portfolio_backtest(
     if s_params is None:
         s_params = _load_screener_params(screener_name)
     top_n = int(cfg.get("top_n_candidates", 50))
-    s_params["top_n_per_day"] = top_n
+    # Map top_n to screener-specific parameter name
+    if screener_name == "hot_money_screener":
+        s_params["max_picks"] = top_n
+    else:
+        s_params["top_n_per_day"] = top_n
     screener_cls = get_screener(screener_name)
     screener = screener_cls(**s_params)
     selection = screener.scan(market_data, scan_dates)

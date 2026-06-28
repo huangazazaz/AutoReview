@@ -4,7 +4,7 @@ import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
 import { formatNumber, formatPct, formatAmount } from '@/utils/format'
-import type { StrategyInfo, PortfolioBacktestResponse, PortfolioBacktestMetrics } from '@/types'
+import type { StrategyInfo, PortfolioBacktestResponse } from '@/types'
 
 export default function Portfolio() {
   const { showToast, showLoading: showGlobalLoading, hideLoading } = useApp()
@@ -189,7 +189,7 @@ function PortfolioResult({ result, screener, strategy }: {
   screener: string
   strategy: string
 }) {
-  const m: PortfolioBacktestMetrics = result.metrics
+  const m = result.metrics
   if (!m || Object.keys(m).length === 0) {
     return <div className="card"><div className="card-body"><div className="empty-state"><p>无回测结果</p></div></div></div></div>
   }

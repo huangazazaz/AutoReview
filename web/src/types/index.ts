@@ -148,7 +148,6 @@ export interface PortfolioBacktestMetrics {
   win_rate: number
   max_drawdown_pct: number
   sharpe_ratio: number
-  [key: string]: number  // allow Object.entries iteration in strict mode
 }
 
 export interface PortfolioBacktestResponse {

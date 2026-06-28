@@ -268,7 +268,16 @@ def api_generate_strategy(req: GenerateStrategyRequest):
         from autotrade.core.datasource_factory import build_datasource_from_name
 
         # Instantiate the strategy from the dynamically loaded class
-        strategy = strat_class()
+        import yaml
+        strategy_params_dict = {}
+        try:
+            parsed_yaml = yaml.safe_load(generated["yaml_code"])
+            if isinstance(parsed_yaml, dict) and "params" in parsed_yaml:
+                strategy_params_dict = parsed_yaml["params"]
+        except Exception:
+            pass  # Use empty params if YAML parsing fails
+
+        strategy = strat_class(**strategy_params_dict) if strategy_params_dict else strat_class()
 
         ds = build_datasource_from_name("failover")
         bars = ds.get_bars(req.symbol, s, e)

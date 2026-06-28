@@ -85,7 +85,8 @@ class PortfolioBacktestRequest(BaseModel):
     strategy_buy_window: int = 1           # BUY信号匹配窗口
     start: Optional[str] = None
     end: Optional[str] = None
-    symbols: Optional[str] = "all"         # "all" 或逗号分隔代码列表
+    symbols: Optional[str] = None          # 逗号分隔代码列表
+    group: Optional[str] = None            # 分组ID（优先于 symbols）
     datasource: Optional[str] = None
 
 
@@ -157,13 +158,18 @@ def api_portfolio_backtest(req: PortfolioBacktestRequest):
     """组合/账户级回测：单账户多持仓 + Screener选股 + 策略择时。
 
     支持策略驱动模式（如 turtle 管理买卖），也支持纯 Screener 模式。
+    支持 symbols 或 group 两种输入方式。
     """
+    from autotrade.triggers.cli import _resolve_input
+
     s, e = _resolve_dates(req.start, req.end, None)
 
-    # Parse symbols: "all" or comma-separated list
-    symbols = req.symbols or "all"
-    if symbols != "all":
-        symbols = [s.strip() for s in symbols.split(",") if s.strip()]
+    # Resolve symbols: group takes priority, fallback to symbols or "all"
+    symbols_str = _resolve_input(req.symbols, req.group)
+    if not symbols_str:
+        symbols_str = "all"
+
+    symbols = [s.strip() for s in symbols_str.split(",") if s.strip()]
 
     result = run_portfolio_backtest(
         screener_name=req.screener_name,

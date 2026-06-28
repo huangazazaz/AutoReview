@@ -119,6 +119,7 @@ export const api = {
     start?: string
     end?: string
     symbols?: string
+    group?: string
     datasource?: string
   }) => post<PortfolioBacktestResponse>('/portfolio-backtest', params),
 }

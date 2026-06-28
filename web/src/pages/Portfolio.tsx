@@ -4,7 +4,7 @@ import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
 import { formatNumber, formatPct, formatAmount } from '@/utils/format'
-import type { StrategyInfo, PortfolioBacktestResponse } from '@/types'
+import type { StrategyInfo, GroupInfo, PortfolioBacktestResponse } from '@/types'
 
 export default function Portfolio() {
   const { showToast, showLoading: showGlobalLoading, hideLoading } = useApp()
@@ -13,10 +13,13 @@ export default function Portfolio() {
   const [strategy, setStrategy] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [inputMode, setInputMode] = useState<'symbols' | 'group'>('symbols')
   const [symbols, setSymbols] = useState('all')
+  const [group, setGroup] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const [strategies, setStrategies] = useState<StrategyInfo[]>([])
+  const [groups, setGroups] = useState<GroupInfo[]>([])
   const [result, setResult] = useState<PortfolioBacktestResponse | null>(null)
 
   // Strategy params
@@ -26,6 +29,7 @@ export default function Portfolio() {
 
   useEffect(() => {
     api.getStrategies().then(d => setStrategies(d.strategies))
+    api.getGroups().then(d => setGroups(d.groups))
   }, [])
 
   useEffect(() => {
@@ -48,7 +52,13 @@ export default function Portfolio() {
   const submit = useCallback(async () => {
     const params: any = {
       screener_name: screener,
-      symbols,
+    }
+
+    if (inputMode === 'group') {
+      if (!group) { showToast('请选择分组', 'warning'); return }
+      params.group = group
+    } else {
+      params.symbols = symbols || 'all'
     }
 
     if (strategy) {
@@ -88,7 +98,7 @@ export default function Portfolio() {
       setSubmitting(false)
       hideLoading()
     }
-  }, [screener, strategy, startDate, endDate, symbols, editParams, paramSchema])
+  }, [screener, strategy, startDate, endDate, inputMode, symbols, group, editParams, paramSchema])
 
   const hasParams = strategy && Object.keys(paramSchema).length > 0
 
@@ -114,13 +124,27 @@ export default function Portfolio() {
                 {strategies.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
               </select>
             </div>
+          <div className="tabs" style={{ marginBottom: 12 }}>
+            <button className={'tab' + (inputMode === 'symbols' ? ' active' : '')} onClick={() => setInputMode('symbols')}>按代码</button>
+            <button className={'tab' + (inputMode === 'group' ? ' active' : '')} onClick={() => setInputMode('group')}>按分组</button>
+          </div>
+
+          {inputMode === 'symbols' ? (
             <div className="form-group">
-              <label className="form-label" htmlFor="pf-symbols">股票池</label>
-              <select className="form-select" id="pf-symbols" value={symbols} onChange={e => setSymbols(e.target.value)}>
-                <option value="all">全市场 (all)</option>
-                <option value="000001,000002,600000,600036,601318">测试集 (5只)</option>
+              <label className="form-label" htmlFor="pf-symbols">股票代码</label>
+              <input type="text" className="form-input" id="pf-symbols"
+                placeholder="逗号分隔，或输入 'all' 全市场"
+                value={symbols} onChange={e => setSymbols(e.target.value)} />
+            </div>
+          ) : (
+            <div className="form-group">
+              <label className="form-label" htmlFor="pf-group">选择分组</label>
+              <select className="form-select" id="pf-group" value={group} onChange={e => setGroup(e.target.value)}>
+                <option value="">— 选择分组 —</option>
+                {groups.map(g => <option key={g.id} value={g.id}>{g.name} ({g.symbols.length} 只)</option>)}
               </select>
             </div>
+          )}
             <div className="form-group" style={{ minWidth: 280 }}>
               <label className="form-label">日期范围</label>
               <DateRangeInput startDate={startDate} endDate={endDate}

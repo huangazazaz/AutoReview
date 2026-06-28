@@ -198,6 +198,10 @@ def show(result: str):
 @cli.command("portfolio-backtest")
 @click.option("--screener", "-s", default="momentum_screener",
               help="选股筛选器名称")
+@click.option("--strategy", default=None,
+              help="策略名 (如 turtle, ma_cross)。不指定则纯 Screener 模式")
+@click.option("--strategy-params", default=None,
+              help="策略参数 JSON 字符串 (如 '{\"allow_short\": false}')")
 @click.option("--start", default=None, help="开始日期 YYYY-MM-DD（默认从配置读取）")
 @click.option("--end", default=None, help="结束日期 YYYY-MM-DD（默认从配置读取）")
 @click.option("--symbols", default="all", help="股票代码列表，'all' 表示全市场")
@@ -205,20 +209,39 @@ def show(result: str):
               default=["console", "plot"],
               help="报告输出方式 (console, csv, plot)")
 @click.pass_context
-def portfolio_backtest_cmd(ctx, screener, start, end, symbols, reporters):
+def portfolio_backtest_cmd(ctx, screener, strategy, strategy_params, start, end,
+                           symbols, reporters):
     """组合级回测: 单账户多持仓 + 每日选股 + 统一出场。
 
     基于 config/backtest/portfolio.yaml 配置，从全市场筛选候选股，
     按信号强度分仓买入，统一出场规则管理风险。
+
+    \b
+    策略驱动模式示例:
+      autotrade portfolio-backtest --strategy turtle
+      autotrade portfolio-backtest --strategy turtle --strategy-params '{"allow_short": false}'
     """
     from autotrade.core.engine import run_portfolio_backtest
 
     start_date = _parse_date(start)
     end_date = _parse_date(end)
 
+    # Parse strategy params JSON if provided
+    sp = None
+    if strategy_params:
+        try:
+            sp = json.loads(strategy_params)
+        except json.JSONDecodeError as e:
+            click.echo(f"策略参数 JSON 解析失败: {e}", err=True)
+            return
+
     click.echo(f"\n{'='*60}")
     click.echo(f"  组合回测")
     click.echo(f"  筛选器: {screener}")
+    if strategy:
+        click.echo(f"  策略:   {strategy}")
+        if sp:
+            click.echo(f"  策略参数: {sp}")
     click.echo(f"  区间: {start or '从配置读取'} → {end or '从配置读取'}")
     click.echo(f"  股票池: {symbols}")
     click.echo(f"{'='*60}\n")
@@ -228,6 +251,8 @@ def portfolio_backtest_cmd(ctx, screener, start, end, symbols, reporters):
         start=start_date,
         end=end_date,
         symbols=symbols,
+        strategy_name=strategy,
+        strategy_params=sp,
         reporter_names=tuple(reporters),
     )
 

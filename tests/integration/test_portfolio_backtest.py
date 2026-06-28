@@ -30,3 +30,36 @@ def test_portfolio_backtest_small_scale():
     assert result.get("trade_count", -1) >= 0
 
     print(f"Integration test passed: {metrics}")
+
+
+def test_portfolio_backtest_with_strategy():
+    """Run a 1-month portfolio backtest with Turtle strategy driving signals."""
+    init_registry()
+
+    result = run_portfolio_backtest(
+        screener_name="momentum_screener",
+        strategy_name="turtle",
+        strategy_params={
+            "use_system1": True,
+            "use_system2": False,
+            "allow_long": True,
+            "allow_short": False,
+        },
+        start=date(2025, 1, 2),
+        end=date(2025, 1, 31),
+        symbols=["000001", "000002", "600000", "600036", "601318"],
+        reporter_names=(),
+    )
+
+    # Should not error
+    assert "error" not in result, f"Strategy backtest failed: {result.get('error')}"
+
+    # Should have metrics
+    metrics = result.get("metrics", {})
+    assert "total_return_pct" in metrics
+    assert "sharpe_ratio" in metrics
+
+    # Trade count should be non-negative
+    assert result.get("trade_count", -1) >= 0
+
+    print(f"Strategy integration test passed: {metrics}")

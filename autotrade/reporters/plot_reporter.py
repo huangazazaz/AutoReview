@@ -163,3 +163,12 @@ class PlotReporter(Reporter):
             print(f"  Max Drawdown:     {metrics.get('max_drawdown_pct', 0):.2f}%")
             print(f"  Sharpe Ratio:     {metrics.get('sharpe_ratio', 0):.4f}")
             print(f"  Total Trades:     {metrics.get('total_trades', 0)}")
+
+            # Trigger breakdown
+            if hasattr(result, 'trades') and result.trades:
+                from collections import Counter
+                trigger_counts = Counter(t.trigger for t in result.trades if t.trigger)
+                if trigger_counts:
+                    print("\n  ── Exit Triggers ──")
+                    for trigger, count in trigger_counts.most_common():
+                        print(f"  {trigger}:  {count}")

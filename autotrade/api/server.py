@@ -6,6 +6,9 @@
   POST /analyze              单股回测
   POST /backtest             多股/分组回测
   POST /portfolio-backtest   组合/账户级回测（Screener + 策略）
+  POST /ai/generate-strategy AI生成策略+回测
+  POST /strategies/save      保存AI生成的策略
+  DELETE /strategies/{name}  删除策略
   POST /bars                 日线数据查询
   GET  /strategies           策略列表
   GET  /groups            分组列表
@@ -20,6 +23,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import importlib.util
 from datetime import date
 from typing import Optional
 
@@ -88,6 +93,21 @@ class PortfolioBacktestRequest(BaseModel):
     symbols: Optional[str] = None          # 逗号分隔代码列表
     group: Optional[str] = None            # 分组ID（优先于 symbols）
     datasource: Optional[str] = None
+
+
+class GenerateStrategyRequest(BaseModel):
+    """AI 策略生成请求。"""
+    prompt: str                              # 自然语言策略描述
+    symbol: str = "600522"                   # 回测股票代码
+    start: Optional[str] = None
+    end: Optional[str] = None
+
+
+class SaveStrategyRequest(BaseModel):
+    """保存 AI 生成的策略到文件系统。"""
+    name: str
+    python_code: str
+    yaml_code: str
 
 
 # ---- 启动事件 ----
@@ -192,6 +212,143 @@ def api_portfolio_backtest(req: PortfolioBacktestRequest):
         "trade_count": result.get("trade_count", 0),
         "output_dir": result.get("output_dir", ""),
     }
+
+
+def _get_deepseek_api_key() -> Optional[str]:
+    """Get DeepSeek API key from environment."""
+    return os.environ.get("DEEPSEEK_API_KEY")
+
+
+@app.post("/ai/generate-strategy")
+def api_generate_strategy(req: GenerateStrategyRequest):
+    """AI 生成交易策略 + 单股快速回测。"""
+    from autotrade.ai.strategy_generator import StrategyGenerator
+    from autotrade.core.engine import analyze_stock
+
+    api_key = _get_deepseek_api_key()
+    if not api_key:
+        return {"error": "未配置 DEEPSEEK_API_KEY 环境变量"}
+
+    # 1. Generate strategy
+    gen = StrategyGenerator(api_key=api_key)
+    generated = gen.generate(req.prompt)
+    if "error" in generated:
+        return generated
+
+    # 2. Dynamically load and run backtest
+    s, e = _resolve_dates(req.start, req.end, "1y")
+    backtest_result = None
+    try:
+        strategy_code = generated["python_code"]
+        spec = importlib.util.spec_from_loader(
+            generated["name"], loader=None, origin="<ai_generated>")
+        if spec is None:
+            raise RuntimeError("Failed to create module spec")
+
+        module = importlib.util.module_from_spec(spec)
+        exec(strategy_code, module.__dict__)
+
+        # Find the strategy class in the module
+        strat_class = None
+        for attr_name in dir(module):
+            obj = getattr(module, attr_name)
+            if (isinstance(obj, type)
+                    and hasattr(obj, "generate_signals")
+                    and hasattr(obj, "name")
+                    and attr_name != "Strategy"):
+                strat_class = obj
+                break
+
+        if strat_class is None:
+            raise RuntimeError("未在生成的代码中找到策略类")
+
+        result = analyze_stock(
+            symbol=req.symbol,
+            strategy_name=strat_class.name,
+            start=s,
+            end=e,
+            datasource_name="failover",
+        )
+        if "error" not in result:
+            backtest_result = {
+                "symbol": req.symbol,
+                "return_pct": round(result.get("total_return_pct", 0), 2),
+                "win_rate": round(result.get("win_rate", 0), 2),
+                "sharpe_ratio": round(result.get("sharpe_ratio", 0), 4),
+                "max_drawdown_pct": round(result.get("max_drawdown_pct", 0), 2),
+                "total_trades": result.get("total_trades", 0),
+            }
+    except Exception as e:
+        logger.warning("Failed to backtest generated strategy: %s", e)
+
+    return {
+        "name": generated["name"],
+        "display_name": generated["display_name"],
+        "description": generated["description"],
+        "python_code": generated["python_code"],
+        "yaml_code": generated["yaml_code"],
+        "reasoning": generated.get("reasoning", ""),
+        "backtest": backtest_result,
+    }
+
+
+@app.post("/strategies/save")
+def api_save_strategy(req: SaveStrategyRequest):
+    """保存 AI 生成的策略到文件系统。"""
+    from autotrade.ai.strategy_generator import StrategyGenerator
+    from autotrade.registry import init_registry as reload_registry
+
+    if StrategyGenerator.is_builtin(req.name):
+        return {"error": f"不能覆盖内置策略: {req.name}"}
+
+    py_path = Path(__file__).resolve().parent.parent / "strategies" / f"{req.name}.py"
+    yaml_path = Path(__file__).resolve().parent.parent.parent / "config" / "strategies" / f"{req.name}.yaml"
+
+    if py_path.exists() or yaml_path.exists():
+        return {"error": f"策略 {req.name} 已存在，请先删除或使用不同名称"}
+
+    py_path.parent.mkdir(parents=True, exist_ok=True)
+    yaml_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(py_path, "w", encoding="utf-8") as f:
+        f.write(req.python_code)
+    with open(yaml_path, "w", encoding="utf-8") as f:
+        f.write(req.yaml_code)
+
+    reload_registry(force_reload=True)
+
+    return {
+        "success": True,
+        "name": req.name,
+        "python_path": str(py_path),
+        "yaml_path": str(yaml_path),
+    }
+
+
+@app.delete("/strategies/{name}")
+def api_delete_strategy(name: str):
+    """删除 AI 生成的策略。内置策略不可删除。"""
+    from autotrade.ai.strategy_generator import StrategyGenerator
+    from autotrade.registry import init_registry as reload_registry
+
+    if StrategyGenerator.is_builtin(name):
+        return {"error": f"不能删除内置策略: {name}"}
+
+    py_path = Path(__file__).resolve().parent.parent / "strategies" / f"{name}.py"
+    yaml_path = Path(__file__).resolve().parent.parent.parent / "config" / "strategies" / f"{name}.yaml"
+
+    deleted = []
+    for p in [py_path, yaml_path]:
+        if p.exists():
+            p.unlink()
+            deleted.append(str(p))
+
+    if not deleted:
+        return {"error": f"策略 {name} 不存在"}
+
+    reload_registry(force_reload=True)
+
+    return {"success": True, "name": name, "deleted": deleted}
 
 
 @app.get("/strategies")

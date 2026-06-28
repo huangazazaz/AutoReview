@@ -262,24 +262,42 @@ def api_generate_strategy(req: GenerateStrategyRequest):
         if strat_class is None:
             raise RuntimeError("未在生成的代码中找到策略类")
 
-        result = analyze_stock(
-            symbol=req.symbol,
-            strategy_name=strat_class.name,
-            start=s,
-            end=e,
-            datasource_name="failover",
-        )
-        if "error" not in result:
+        # Run backtest directly (bypass registry — the strategy isn't registered)
+        from autotrade.core.engine import _bars_to_dataframe, _make_backtest_config
+        from autotrade.core.backtester import Backtester
+        from autotrade.core.datasource_factory import build_datasource_from_name
+
+        # Instantiate the strategy from the dynamically loaded class
+        strategy = strat_class()
+
+        ds = build_datasource_from_name("failover")
+        bars = ds.get_bars(req.symbol, s, e)
+        if not bars:
+            logger.warning("No bar data for %s", req.symbol)
+        else:
+            df = _bars_to_dataframe(bars)
+            for ind in strategy.required_indicators:
+                df = ind.compute(df)
+
+            raw_signals = strategy.generate_signals(df)
+            for sig in raw_signals:
+                if not sig.symbol:
+                    sig.symbol = req.symbol
+
+            config = _make_backtest_config()
+            backtester = Backtester(config)
+            result = backtester.run(raw_signals, bars)
+
             backtest_result = {
                 "symbol": req.symbol,
-                "return_pct": round(result.get("total_return_pct", 0), 2),
-                "win_rate": round(result.get("win_rate", 0), 2),
-                "sharpe_ratio": round(result.get("sharpe_ratio", 0), 4),
-                "max_drawdown_pct": round(result.get("max_drawdown_pct", 0), 2),
-                "total_trades": result.get("total_trades", 0),
+                "return_pct": round(result.metrics.get("total_return_pct", 0), 2),
+                "win_rate": round(result.metrics.get("win_rate", 0), 2),
+                "sharpe_ratio": round(result.metrics.get("sharpe_ratio", 0), 4),
+                "max_drawdown_pct": round(result.metrics.get("max_drawdown_pct", 0), 2),
+                "total_trades": len(result.trades),
             }
-    except Exception as e:
-        logger.warning("Failed to backtest generated strategy: %s", e)
+    except Exception as ex:
+        logger.warning("Failed to backtest generated strategy: %s", ex)
 
     return {
         "name": generated["name"],

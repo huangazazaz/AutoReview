@@ -15,6 +15,10 @@ class TestStrategyGenerator:
         assert "均线金叉" in prompt
         assert "Strategy" in prompt
         assert "json" in prompt.lower()
+        assert "ind_ma_" in prompt
+        assert "ind_rsi_" in prompt
+        assert "ind_macd_macd" in prompt
+        assert "ind_bb_lower" in prompt
 
     def test_parse_valid_json_response(self):
         gen = StrategyGenerator(api_key="test-key")

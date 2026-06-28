@@ -39,12 +39,14 @@ STRATEGY_GEN_PROMPT = """你是一个量化策略工程师。根据用户的自�
   - 返回 Signal(symbol="", date=date, action="BUY"/"SELL", strength=0.0~1.0, reason="说明")
 
 可用的指标类（导入路径 → 类名 → 输出列）:
-- from autotrade.indicators.ma import MA(period: int) → 列: ma_{{period}}
-- from autotrade.indicators.ma import EMA(period: int) → 列: ema_{{period}}
-- from autotrade.indicators.rsi import RSI(period: int) → 列: rsi
-- from autotrade.indicators.atr import ATR(period: int) → 列: atr_{{period}}
-- from autotrade.indicators.macd import MACD(fast: int, slow: int, signal: int) → 列: macd, macd_signal, macd_hist
-- from autotrade.indicators.bollinger import BollingerBands(period: int, std: float) → 列: bb_upper, bb_middle, bb_lower
+- from autotrade.indicators.ma import MA(period: int) → 列: ind_ma_{{period}}
+- from autotrade.indicators.ma import EMA(period: int) → 列: ind_ema_{{period}}
+- from autotrade.indicators.rsi import RSI(period: int) → 列: ind_rsi_{{period}}
+- from autotrade.indicators.atr import ATR(period: int) → 列: ind_atr_{{period}}
+- from autotrade.indicators.macd import MACD(fast: int, slow: int, signal: int) → 列: ind_macd_macd, ind_macd_signal, ind_macd_histogram
+- from autotrade.indicators.bollinger import BollingerBands(period: int, std: float) → 列: ind_bb_lower_{{period}}_{{std}}, ind_bb_middle_{{period}}_{{std}}, ind_bb_upper_{{period}}_{{std}}
+
+重要: 所有列名都有 ind_ 前缀！例如 MA(5) 产生列 ind_ma_5，RSI(14) 产生列 ind_rsi_14。
 
 YAML 格式:
 strategy: <name>

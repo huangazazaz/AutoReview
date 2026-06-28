@@ -37,6 +37,7 @@ class PortfolioTrade:
     quantity: int
     pnl: float
     pnl_pct: float
+    trigger: str = ""  # "strategy_buy" | "strategy_sell" | "trailing_stop" | ...
 
 
 @dataclass

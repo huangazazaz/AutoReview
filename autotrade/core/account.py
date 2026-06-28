@@ -15,6 +15,7 @@ class PortfolioPosition:
     quantity: int
     highest_close_since_entry: float
     locked_until: Optional[date] = None  # T+1: cannot sell before this date
+    entry_trigger: str = ""  # "strategy_buy" | "screener" — how this position was entered
 
     def days_held(self, current_date: date) -> int:
         return (current_date - self.entry_date).days
@@ -45,6 +46,7 @@ class PendingBuy:
     """A buy order planned for the next trading day."""
     symbol: str
     quantity: int
+    trigger: str = ""  # "strategy_buy" | "screener"
 
 
 @dataclass

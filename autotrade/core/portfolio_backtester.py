@@ -15,6 +15,7 @@ from autotrade.core.account import (
 )
 from autotrade.core.exit_manager import ExitManager
 from autotrade.core.market_regime import MarketRegime
+from autotrade.core.strategy_signal_cache import StrategySignalCache
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ class PortfolioBacktestConfig:
     allow_t_plus_1: bool = True
     exit_rules: dict = field(default_factory=dict)
     market_regime: dict = field(default_factory=dict)
+    strategy_name: str | None = None       # Strategy name (None = screener-only)
+    strategy_params: dict | None = None    # Strategy parameter overrides
+    strategy_buy_window: int = 1           # ±days for BUY signal matching
 
 
 @dataclass
@@ -65,6 +69,7 @@ class PortfolioBacktester:
         self,
         market_data: dict[str, pd.DataFrame],
         screener_results: dict[date, list[tuple[str, float, str]]],
+        signal_cache: "StrategySignalCache | None" = None,
     ) -> PortfolioBacktestResult:
         """Execute the portfolio backtest.
 
@@ -129,6 +134,18 @@ class PortfolioBacktester:
                 if price > pos.highest_close_since_entry:
                     pos.highest_close_since_entry = price
 
+                # --- Check strategy SELL signals first ---
+                strategy_sold = False
+                if signal_cache is not None:
+                    if signal_cache.has_sell(symbol, today):
+                        self._execute_sell(
+                            account, pos, price, today, ["strategy_sell"],
+                        )
+                        strategy_sold = True
+
+                if strategy_sold:
+                    continue  # already sold, skip ExitManager
+
                 triggers = self.exit_manager.check(
                     pos, price, today, prev_screener, prev_date or today,
                 )
@@ -152,10 +169,19 @@ class PortfolioBacktester:
                         if s not in held
                     ][:self.config.top_n_candidates]
 
+                    # --- Filter to strategy-confirmed candidates ---
+                    if signal_cache is not None:
+                        window = self.config.strategy_buy_window
+                        available = [
+                            (s, sc, t) for s, sc, t in available
+                            if signal_cache.has_buy(s, today, window=window)
+                        ]
+
                     picks = available[:slots]
                     if picks:
+                        buy_trigger = "strategy_buy" if signal_cache is not None else "screener"
                         pending_buys = self._plan_buys(
-                            picks, account.cash, opens,
+                            picks, account.cash, opens, trigger=buy_trigger,
                         )
 
             prev_date = today
@@ -243,6 +269,7 @@ class PortfolioBacktester:
             quantity=quantity,
             highest_close_since_entry=fill_price,
             locked_until=locked_until,
+            entry_trigger=buy.trigger,
         )
         account.positions[buy.symbol] = position
 
@@ -272,6 +299,7 @@ class PortfolioBacktester:
             quantity=quantity,
             pnl=round(pnl, 2),
             pnl_pct=round(pnl_pct, 4),
+            trigger=triggers[0] if triggers else position.entry_trigger,
         )
         account.trades.append(trade)
         del account.positions[position.symbol]
@@ -281,6 +309,7 @@ class PortfolioBacktester:
         picks: list[tuple[str, float, str]],
         cash: float,
         opens: dict[str, float],
+        trigger: str = "screener",
     ) -> list[PendingBuy]:
         """Allocate cash by signal strength and create pending buys."""
         total_score = sum(sc for _, sc, _ in picks)
@@ -300,7 +329,7 @@ class PortfolioBacktester:
             qty = int(alloc / (fill_price * (1 + self.config.commission_rate))
                       / self.config.lot_size) * self.config.lot_size
             if qty > 0:
-                pending.append(PendingBuy(symbol=symbol, quantity=qty))
+                pending.append(PendingBuy(symbol=symbol, quantity=qty, trigger=trigger))
 
         return pending
 

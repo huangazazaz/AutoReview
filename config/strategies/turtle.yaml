@@ -38,3 +38,10 @@ params:
 
   # ---- 系统一过滤器 ----
   skip_if_last_win_sys1: true  # 上一次系统一盈利则跳过下次信号
+
+  # ---- 趋势过滤 ----
+  use_trend_filter: false       # 启用MA趋势过滤（仅顺大势交易）
+  trend_ma_fast: 30             # 快线周期
+  trend_ma_slow: 50             # 慢线周期
+                                 # 做多: MA30 > MA50 才入场
+                                 # 做空: MA30 < MA50 才入场

@@ -6,6 +6,7 @@ Core rules:
 - Position sizing: 1 Unit = 1% of account / (N × point_value)
 - Pyramiding: add 1 unit every 0.5N favorable move, max 4 units
 - Stop loss: 2N against entry price, adjusted per pyramid add
+- Trend filter (optional): only long when MA(fast) > MA(slow), only short when MA(fast) < MA(slow)
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ import pandas as pd
 from autotrade.core.interfaces import Strategy
 from autotrade.core.models import Signal
 from autotrade.indicators.atr import ATR
+from autotrade.indicators.ma import MA
 
 
 class TurtleTraderStrategy(Strategy):
@@ -47,6 +49,10 @@ class TurtleTraderStrategy(Strategy):
         allow_short: bool = True,
         # System 1 filter
         skip_if_last_win_sys1: bool = True,
+        # Trend filter
+        use_trend_filter: bool = False,
+        trend_ma_fast: int = 30,
+        trend_ma_slow: int = 50,
     ):
         self.system1_entry = system1_entry
         self.system1_exit = system1_exit
@@ -62,8 +68,16 @@ class TurtleTraderStrategy(Strategy):
         self.allow_long = allow_long
         self.allow_short = allow_short
         self.skip_if_last_win_sys1 = skip_if_last_win_sys1
+        self.use_trend_filter = use_trend_filter
+        self.trend_ma_fast = trend_ma_fast
+        self.trend_ma_slow = trend_ma_slow
 
         self.required_indicators = [ATR(period=atr_period)]
+        if use_trend_filter:
+            self.required_indicators.extend([
+                MA(period=trend_ma_fast),
+                MA(period=trend_ma_slow),
+            ])
 
     # ------------------------------------------------------------------
     def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
@@ -72,6 +86,13 @@ class TurtleTraderStrategy(Strategy):
         atr_col = f"ind_atr_{self.atr_period}"
         if atr_col not in df.columns or "high" not in df.columns or "low" not in df.columns:
             return signals
+
+        # Trend filter columns (only if enabled)
+        ma_fast_col = f"ind_ma_{self.trend_ma_fast}" if self.use_trend_filter else None
+        ma_slow_col = f"ind_ma_{self.trend_ma_slow}" if self.use_trend_filter else None
+        if self.use_trend_filter:
+            if ma_fast_col not in df.columns or ma_slow_col not in df.columns:
+                return signals
 
         n_days = len(df)
         min_days = max(self.system1_entry, self.system2_entry,
@@ -125,6 +146,15 @@ class TurtleTraderStrategy(Strategy):
             if pd.isna(N) or N <= 0:
                 continue
 
+            # Trend direction for this day
+            trend_up: bool | None = None
+            if self.use_trend_filter:
+                ma_fast_val = df[ma_fast_col].iloc[idx]
+                ma_slow_val = df[ma_slow_col].iloc[idx]
+                if pd.isna(ma_fast_val) or pd.isna(ma_slow_val):
+                    continue
+                trend_up = ma_fast_val > ma_slow_val
+
             for sys_key, entry_period, exit_period in systems:
                 # Entry/exit channel values for this day
                 entry_high = roll_high.rolling(entry_period).max().iloc[idx]
@@ -142,12 +172,14 @@ class TurtleTraderStrategy(Strategy):
                     signals, long_state[sys_key], current_date,
                     close_price, high_price, low_price, N,
                     sys_key, entry_high, entry_low, exit_low,
+                    trend_up,
                 )
                 # ---- SHORT ----
                 self._process_short(
                     signals, short_state[sys_key], current_date,
                     close_price, high_price, low_price, N,
                     sys_key, entry_low, exit_high,
+                    trend_up,
                 )
 
         return signals
@@ -155,7 +187,8 @@ class TurtleTraderStrategy(Strategy):
     # ------------------------------------------------------------------
     def _process_long(self, signals, state, current_date,
                       close, high, low, N, sys_key,
-                      entry_high, entry_low, exit_low):
+                      entry_high, entry_low, exit_low,
+                      trend_up: bool | None = None):
         """Process long signals for one system."""
         if not self.allow_long:
             return
@@ -163,6 +196,10 @@ class TurtleTraderStrategy(Strategy):
         in_position = state["entry_price"] is not None
 
         if pd.isna(entry_high) or pd.isna(exit_low):
+            return
+
+        # --- Trend filter: only long when MA_fast > MA_slow ---
+        if self.use_trend_filter and not in_position and trend_up is False:
             return
 
         # --- Entry ---
@@ -221,7 +258,8 @@ class TurtleTraderStrategy(Strategy):
     # ------------------------------------------------------------------
     def _process_short(self, signals, state, current_date,
                        close, high, low, N, sys_key,
-                       entry_low, exit_high):
+                       entry_low, exit_high,
+                       trend_up: bool | None = None):
         """Process short signals for one system."""
         if not self.allow_short:
             return
@@ -229,6 +267,10 @@ class TurtleTraderStrategy(Strategy):
         in_position = state["entry_price"] is not None
 
         if pd.isna(entry_low) or pd.isna(exit_high):
+            return
+
+        # --- Trend filter: only short when MA_fast < MA_slow ---
+        if self.use_trend_filter and not in_position and trend_up is not False:
             return
 
         # --- Short entry ---

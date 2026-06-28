@@ -54,6 +54,8 @@ params:
   param1: value1
   param2: value2
 
+重要: YAML 中的 params 必须全部在 Python 类的 __init__ 中声明为参数，否则策略无法实例化。例如 YAML 有 stop_loss_pct: 5，则 __init__ 必须有 def __init__(self, stop_loss_pct=5):
+
 用户需求: {user_prompt}"""
 
 

@@ -268,16 +268,23 @@ def api_generate_strategy(req: GenerateStrategyRequest):
         from autotrade.core.datasource_factory import build_datasource_from_name
 
         # Instantiate the strategy from the dynamically loaded class
+        # Try with YAML params first, fall back to no-args if params mismatch
         import yaml
-        strategy_params_dict = {}
+        strategy = None
         try:
             parsed_yaml = yaml.safe_load(generated["yaml_code"])
-            if isinstance(parsed_yaml, dict) and "params" in parsed_yaml:
-                strategy_params_dict = parsed_yaml["params"]
-        except Exception:
-            pass  # Use empty params if YAML parsing fails
-
-        strategy = strat_class(**strategy_params_dict) if strategy_params_dict else strat_class()
+            yaml_params = parsed_yaml.get("params", {}) if isinstance(parsed_yaml, dict) else {}
+            strategy = strat_class(**yaml_params)
+        except (TypeError, Exception):
+            try:
+                strategy = strat_class()
+            except Exception:
+                # Last resort: try with just the required params
+                import inspect
+                sig_params = inspect.signature(strat_class.__init__).parameters
+                # Filter YAML params to only those accepted by __init__
+                accepted = {k: v for k, v in yaml_params.items() if k in sig_params}
+                strategy = strat_class(**accepted) if accepted else strat_class()
 
         ds = build_datasource_from_name("failover")
         bars = ds.get_bars(req.symbol, s, e)
@@ -307,6 +314,7 @@ def api_generate_strategy(req: GenerateStrategyRequest):
             }
     except Exception as ex:
         logger.warning("Failed to backtest generated strategy: %s", ex)
+        backtest_result = {"error": str(ex)}
 
     return {
         "name": generated["name"],

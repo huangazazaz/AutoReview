@@ -45,3 +45,12 @@ params:
   trend_ma_slow: 50             # 慢线周期
                                  # 做多: MA30 > MA50 才入场
                                  # 做空: MA30 < MA50 才入场
+
+  # ---- 放量过滤 ----
+  use_volume_filter: false      # 突破需放量确认
+  volume_ma_period: 20          # 量能均线周期
+  volume_mult: 1.0              # 倍数（>1.0=需显著放量）
+
+  # ---- 移动止盈 ----
+  use_trailing_profit: false    # 启用回撤止盈
+  trailing_profit_pct: 0.05     # 从最高点回撤5%即止盈

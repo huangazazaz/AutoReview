@@ -53,6 +53,13 @@ class TurtleTraderStrategy(Strategy):
         use_trend_filter: bool = False,
         trend_ma_fast: int = 30,
         trend_ma_slow: int = 50,
+        # Volume filter
+        use_volume_filter: bool = False,
+        volume_ma_period: int = 20,
+        volume_mult: float = 1.0,
+        # Trailing profit stop
+        use_trailing_profit: bool = False,
+        trailing_profit_pct: float = 0.05,
     ):
         self.system1_entry = system1_entry
         self.system1_exit = system1_exit
@@ -71,6 +78,11 @@ class TurtleTraderStrategy(Strategy):
         self.use_trend_filter = use_trend_filter
         self.trend_ma_fast = trend_ma_fast
         self.trend_ma_slow = trend_ma_slow
+        self.use_volume_filter = use_volume_filter
+        self.volume_ma_period = volume_ma_period
+        self.volume_mult = volume_mult
+        self.use_trailing_profit = use_trailing_profit
+        self.trailing_profit_pct = trailing_profit_pct
 
         self.required_indicators = [ATR(period=atr_period)]
         if use_trend_filter:
@@ -78,6 +90,9 @@ class TurtleTraderStrategy(Strategy):
                 MA(period=trend_ma_fast),
                 MA(period=trend_ma_slow),
             ])
+        if use_volume_filter:
+            self.required_indicators.append(MA(period=volume_ma_period))
+        # Note: MA for volume is handled separately (column name differs)
 
     # ------------------------------------------------------------------
     def generate_signals(self, df: pd.DataFrame) -> list[Signal]:
@@ -93,6 +108,13 @@ class TurtleTraderStrategy(Strategy):
         if self.use_trend_filter:
             if ma_fast_col not in df.columns or ma_slow_col not in df.columns:
                 return signals
+
+        # Volume filter: compute volume MA inline
+        vol_ma_col = None
+        if self.use_volume_filter:
+            vol_ma_col = f"_vol_ma_{self.volume_ma_period}"
+            if vol_ma_col not in df.columns and "volume" in df.columns:
+                df[vol_ma_col] = df["volume"].rolling(self.volume_ma_period).mean()
 
         n_days = len(df)
         min_days = max(self.system1_entry, self.system2_entry,
@@ -113,7 +135,7 @@ class TurtleTraderStrategy(Strategy):
         # ---- Per-system, per-direction state ----
         def _init_state() -> dict:
             return {"entry_price": None, "units": 0, "last_add_price": None,
-                    "last_trade_win": False}
+                    "last_trade_win": False, "best_price": 0.0}
 
         long_state: dict[str, dict] = {}
         short_state: dict[str, dict] = {}
@@ -146,14 +168,20 @@ class TurtleTraderStrategy(Strategy):
             if pd.isna(N) or N <= 0:
                 continue
 
-            # Trend direction for this day
+            # Trend direction + volume check for this day
             trend_up: bool | None = None
+            volume_ok: bool = True  # default pass if filter disabled
             if self.use_trend_filter:
                 ma_fast_val = df[ma_fast_col].iloc[idx]
                 ma_slow_val = df[ma_slow_col].iloc[idx]
                 if pd.isna(ma_fast_val) or pd.isna(ma_slow_val):
                     continue
                 trend_up = ma_fast_val > ma_slow_val
+            if self.use_volume_filter and vol_ma_col and "volume" in df.columns:
+                vol_ma = df[vol_ma_col].iloc[idx]
+                vol = df["volume"].iloc[idx]
+                if not pd.isna(vol_ma) and vol_ma > 0:
+                    volume_ok = vol > vol_ma * self.volume_mult
 
             for sys_key, entry_period, exit_period in systems:
                 # Entry/exit channel values for this day
@@ -172,14 +200,14 @@ class TurtleTraderStrategy(Strategy):
                     signals, long_state[sys_key], current_date,
                     close_price, high_price, low_price, N,
                     sys_key, entry_high, entry_low, exit_low,
-                    trend_up,
+                    trend_up, volume_ok,
                 )
                 # ---- SHORT ----
                 self._process_short(
                     signals, short_state[sys_key], current_date,
                     close_price, high_price, low_price, N,
                     sys_key, entry_low, exit_high,
-                    trend_up,
+                    trend_up, volume_ok,
                 )
 
         return signals
@@ -188,18 +216,27 @@ class TurtleTraderStrategy(Strategy):
     def _process_long(self, signals, state, current_date,
                       close, high, low, N, sys_key,
                       entry_high, entry_low, exit_low,
-                      trend_up: bool | None = None):
+                      trend_up: bool | None = None,
+                      volume_ok: bool = True):
         """Process long signals for one system."""
         if not self.allow_long:
             return
 
         in_position = state["entry_price"] is not None
 
+        # Update best price since entry (highest for longs, lowest for shorts)
+        if in_position and close > state["best_price"]:
+            state["best_price"] = close
+
         if pd.isna(entry_high) or pd.isna(exit_low):
             return
 
         # --- Trend filter: only long when MA_fast > MA_slow ---
         if self.use_trend_filter and not in_position and trend_up is False:
+            return
+
+        # --- Volume filter: breakout needs volume confirmation ---
+        if self.use_volume_filter and not in_position and not volume_ok:
             return
 
         # --- Entry ---
@@ -254,23 +291,44 @@ class TurtleTraderStrategy(Strategy):
                 reason=f"Turtle {sys_key} exit {self.system1_exit if sys_key == 'sys1' else self.system2_exit}d low",
             ))
             self._reset_long_state(state, close, state["entry_price"])
+            return
+
+        # --- Trailing profit stop ---
+        if self.use_trailing_profit and state["best_price"] > 0:
+            stop_price = state["best_price"] * (1 - self.trailing_profit_pct)
+            if close < stop_price:
+                signals.append(Signal(
+                    symbol="", date=current_date, action="SELL",
+                    strength=1.0,
+                    reason=f"Turtle {sys_key} trail -{self.trailing_profit_pct*100:.0f}% from {state['best_price']:.2f}",
+                ))
+                self._reset_long_state(state, close, state["entry_price"])
 
     # ------------------------------------------------------------------
     def _process_short(self, signals, state, current_date,
                        close, high, low, N, sys_key,
                        entry_low, exit_high,
-                       trend_up: bool | None = None):
+                       trend_up: bool | None = None,
+                       volume_ok: bool = True):
         """Process short signals for one system."""
         if not self.allow_short:
             return
 
         in_position = state["entry_price"] is not None
 
+        # Update best price since entry (for shorts: lowest close)
+        if in_position and (state["best_price"] == 0 or close < state["best_price"]):
+            state["best_price"] = close
+
         if pd.isna(entry_low) or pd.isna(exit_high):
             return
 
         # --- Trend filter: only short when MA_fast < MA_slow ---
         if self.use_trend_filter and not in_position and trend_up is not False:
+            return
+
+        # --- Volume filter: breakdown needs volume confirmation ---
+        if self.use_volume_filter and not in_position and not volume_ok:
             return
 
         # --- Short entry ---
@@ -325,6 +383,18 @@ class TurtleTraderStrategy(Strategy):
                 reason=f"Turtle {sys_key} exit short {self.system1_exit if sys_key == 'sys1' else self.system2_exit}d high",
             ))
             self._reset_short_state(state, close, state["entry_price"])
+            return
+
+        # --- Trailing profit stop (for shorts: cover when price rises from best) ---
+        if self.use_trailing_profit and state["best_price"] > 0:
+            cover_price = state["best_price"] * (1 + self.trailing_profit_pct)
+            if close > cover_price:
+                signals.append(Signal(
+                    symbol="", date=current_date, action="BUY_TO_COVER",
+                    strength=1.0,
+                    reason=f"Turtle {sys_key} trail +{self.trailing_profit_pct*100:.0f}% from {state['best_price']:.2f}",
+                ))
+                self._reset_short_state(state, close, state["entry_price"])
 
     # ------------------------------------------------------------------
     def _compute_unit_strength(self, price: float, N: float) -> float:

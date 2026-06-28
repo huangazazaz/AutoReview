@@ -191,7 +191,7 @@ function PortfolioResult({ result, screener, strategy }: {
 }) {
   const m = result.metrics
   if (!m || Object.keys(m).length === 0) {
-    return <div className="card"><div className="card-body"><div className="empty-state"><p>无回测结果</p></div></div></div></div>
+    return <div className="card"><div className="card-body"><div className="empty-state"><p>无回测结果</p></div></div></div>
   }
 
   const isProfitable = m.total_return_pct >= 0

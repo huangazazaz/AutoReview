@@ -315,7 +315,7 @@ def api_save_strategy(req: SaveStrategyRequest):
     with open(yaml_path, "w", encoding="utf-8") as f:
         f.write(req.yaml_code)
 
-    reload_registry(force_reload=True)
+    reload_registry(force=True)
 
     return {
         "success": True,
@@ -346,7 +346,7 @@ def api_delete_strategy(name: str):
     if not deleted:
         return {"error": f"策略 {name} 不存在"}
 
-    reload_registry(force_reload=True)
+    reload_registry(force=True)
 
     return {"success": True, "name": name, "deleted": deleted}
 

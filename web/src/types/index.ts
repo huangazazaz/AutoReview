@@ -156,3 +156,40 @@ export interface PortfolioBacktestResponse {
   output_dir: string
   error?: string
 }
+
+// ---- AI 策略生成 ----
+export interface AIStrategyBacktest {
+  symbol: string
+  return_pct: number
+  win_rate: number
+  sharpe_ratio: number
+  max_drawdown_pct: number
+  total_trades: number
+}
+
+export interface AIStrategyGenerateResponse {
+  name: string
+  display_name: string
+  description: string
+  python_code: string
+  yaml_code: string
+  reasoning: string
+  backtest: AIStrategyBacktest | null
+  error?: string
+  raw?: string
+}
+
+export interface SaveStrategyResponse {
+  success?: boolean
+  name: string
+  python_path?: string
+  yaml_path?: string
+  error?: string
+}
+
+export interface DeleteStrategyResponse {
+  success?: boolean
+  name: string
+  deleted?: string[]
+  error?: string
+}

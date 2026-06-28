@@ -10,6 +10,7 @@ const navItems = [
   { path: '/analyze', label: '单股分析', icon: 'search' },
   { path: '/backtest', label: '批量回测', icon: 'chart' },
   { path: '/portfolio', label: '组合回测', icon: 'portfolio' },
+  { path: '/ai-strategy', label: 'AI 策略', icon: 'ai' },
   { path: '/bars', label: 'K线数据', icon: 'candlestick' },
   { path: '/groups', label: '分组管理', icon: 'folder' },
 ]
@@ -49,6 +50,13 @@ const svgIcons: Record<string, JSX.Element> = {
       <path d="M7 16l4-6 4 3 3-5"/>
       <circle cx="7" cy="16" r="1" fill="currentColor" fillOpacity="0.5"/>
       <circle cx="17" cy="8" r="1" fill="currentColor" fillOpacity="0.5"/>
+    </svg>
+  ),
+  ai: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a4 4 0 0 1 4 4v1h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2V6a4 4 0 0 1 4-4Z"/>
+      <circle cx="12" cy="14" r="2" fill="currentColor" fillOpacity="0.5"/>
+      <path d="M12 3v3"/>
     </svg>
   ),
 }

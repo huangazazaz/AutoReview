@@ -9,6 +9,9 @@ import type {
   CachedStocksResponse,
   HealthResponse,
   PortfolioBacktestResponse,
+  AIStrategyGenerateResponse,
+  SaveStrategyResponse,
+  DeleteStrategyResponse,
 } from '@/types'
 
 const BASE = ''
@@ -48,6 +51,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 function get<T>(path: string): Promise<T> { return request<T>('GET', path) }
 function post<T>(path: string, body?: unknown): Promise<T> { return request<T>('POST', path, body) }
+function del<T>(path: string): Promise<T> { return request<T>('DELETE', path, null) }
 function put<T>(path: string, body?: unknown): Promise<T> { return request<T>('PUT', path, body) }
 function del<T>(path: string): Promise<T> { return request<T>('DELETE', path) }
 
@@ -122,4 +126,19 @@ export const api = {
     group?: string
     datasource?: string
   }) => post<PortfolioBacktestResponse>('/portfolio-backtest', params),
+
+  generateStrategy: (params: {
+    prompt: string
+    symbol?: string
+    start?: string
+    end?: string
+  }) => post<AIStrategyGenerateResponse>('/ai/generate-strategy', params),
+
+  saveStrategy: (params: {
+    name: string
+    python_code: string
+    yaml_code: string
+  }) => post<SaveStrategyResponse>('/strategies/save', params),
+
+  deleteStrategy: (name: string) => del<DeleteStrategyResponse>(`/strategies/${name}`),
 }

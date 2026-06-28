@@ -38,12 +38,13 @@ STRATEGY_GEN_PROMPT = """你是一个量化策略工程师。根据用户的自�
   - df 的 index 是 date，包含 open/high/low/close/volume 列 + 指标列
   - 返回 Signal(symbol="", date=date, action="BUY"/"SELL", strength=0.0~1.0, reason="说明")
 
-可用的指标类 (在 autotrade.indicators 包中):
-- MARibbon(period: int) → 列: ma_{{period}}
-- RSIIndicator(period: int) → 列: rsi
-- ATRIndicator(period: int) → 列: atr
-- MACDIndicator(fast: int, slow: int, signal: int) → 列: macd, macd_signal, macd_hist
-- BollingerIndicator(period: int, std: float) → 列: bb_upper, bb_middle, bb_lower
+可用的指标类（导入路径 → 类名 → 输出列）:
+- from autotrade.indicators.ma import MA(period: int) → 列: ma_{{period}}
+- from autotrade.indicators.ma import EMA(period: int) → 列: ema_{{period}}
+- from autotrade.indicators.rsi import RSI(period: int) → 列: rsi
+- from autotrade.indicators.atr import ATR(period: int) → 列: atr_{{period}}
+- from autotrade.indicators.macd import MACD(fast: int, slow: int, signal: int) → 列: macd, macd_signal, macd_hist
+- from autotrade.indicators.bollinger import BollingerBands(period: int, std: float) → 列: bb_upper, bb_middle, bb_lower
 
 YAML 格式:
 strategy: <name>

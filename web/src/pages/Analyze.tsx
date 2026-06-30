@@ -659,7 +659,7 @@ export default function Analyze() {
           </div>
 
           {/* Equity curve chart */}
-          <div className="chart-container large" style={{ marginBottom: 24 }}>
+          <div className="chart-container kl-chart" style={{ marginBottom: 24 }}>
             <div
               ref={chartContainerRef}
               style={{ width: '100%', minHeight: 480 }}

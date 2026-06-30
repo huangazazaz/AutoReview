@@ -67,8 +67,12 @@
     --radius-lg: 12px;
     --radius-xl: 16px;
 
-    --sidebar-width: 240px;
+    --sidebar-width: 220px;
+    --sidebar-collapsed-width: 60px;
     --header-height: 0px;
+    --content-max-width: 1280px;
+    --content-padding-x: 20px;
+    --content-padding-y: 16px;
 
     --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'SF Mono', monospace;
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',

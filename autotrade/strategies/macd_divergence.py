@@ -49,8 +49,8 @@ class MACDDivergenceStrategy(Strategy):
         self.slow = int(slow)
         self.signal = int(signal)
         self.lookback = int(lookback)
-        self.buy_strength = int(buy_strength)
-        self.sell_strength = int(sell_strength)
+        self.buy_strength = float(buy_strength)
+        self.sell_strength = float(sell_strength)
         self.name = "macd_divergence"
         self.required_indicators = [MACD(fast=fast, slow=slow, signal=signal)]
 

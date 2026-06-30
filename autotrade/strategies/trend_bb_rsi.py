@@ -96,7 +96,7 @@ class TrendBBRSIStrategy(Strategy):
         self.macd_slow = int(macd_slow)
         self.macd_signal = int(macd_signal)
         self.vol_period = int(vol_period)
-        self.vol_factor = int(vol_factor)
+        self.vol_factor = float(vol_factor)
         self.stop_loss = float(stop_loss)
         self.trailing_stop = float(trailing_stop)
 

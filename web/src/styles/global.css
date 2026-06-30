@@ -1744,3 +1744,12 @@ code {
   background: rgba(245, 158, 11, 0.3);
   color: #fff;
 }
+
+/* react-select menu portal (renders to document.body, avoids overflow/z-index issues) */
+.rs__menu-portal .rs__menu {
+  z-index: 10002 !important;
+}
+/* react-select loading indicator */
+.react-select .rs__loading-indicator {
+  color: var(--accent);
+}

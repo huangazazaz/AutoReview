@@ -472,6 +472,9 @@ export default function Analyze() {
                 }}
                 isClearable
                 isSearchable
+                isLoading={cachedStocks.length === 0}
+                loadingMessage={() => '正在加载股票列表…'}
+                menuPortalTarget={document.body}
                 className="react-select"
                 classNamePrefix="rs"
                 noOptionsMessage={() => '未找到，输入代码后按回车创建'}
@@ -490,6 +493,9 @@ export default function Analyze() {
                 value={strategyName ? { value: strategyName, label: strategyName } : null}
                 onChange={(o) => handleStrategyChange(o?.value || '')}
                 isClearable
+                isLoading={strategies.length === 0}
+                loadingMessage={() => '正在加载策略…'}
+                menuPortalTarget={document.body}
                 className="react-select"
                 classNamePrefix="rs"
               />
@@ -504,6 +510,7 @@ export default function Analyze() {
                 options={PERIOD_OPTIONS}
                 value={PERIOD_OPTIONS.find(p => p.value === period) || null}
                 onChange={(o) => handlePeriodChange(o?.value || '1y')}
+                menuPortalTarget={document.body}
                 className="react-select"
                 classNamePrefix="rs"
               />
@@ -526,6 +533,9 @@ export default function Analyze() {
                 value={datasource ? { value: datasource, label: datasource === 'auto' ? '自动（主备降级）' : datasource } : null}
                 onChange={(o) => setDatasource(o?.value || '')}
                 isClearable
+                isLoading={datasources.length === 0}
+                loadingMessage={() => '正在加载…'}
+                menuPortalTarget={document.body}
                 className="react-select"
                 classNamePrefix="rs"
               />

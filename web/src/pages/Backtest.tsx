@@ -519,6 +519,9 @@ const Backtest = () => {
                       }}
                       isClearable
                       isSearchable
+                      isLoading={cachedStocks.length === 0}
+                      loadingMessage={() => '正在加载股票列表…'}
+                      menuPortalTarget={document.body}
                       className="react-select"
                       classNamePrefix="rs"
                       noOptionsMessage={() => '未找到，输入代码后按回车添加'}
@@ -556,6 +559,9 @@ const Backtest = () => {
                         onChange={(o) => setSelectedCachedStock(o?.value || '')}
                         isSearchable
                         isClearable
+                        isLoading={cachedStocks.length === 0}
+                        loadingMessage={() => '正在加载…'}
+                        menuPortalTarget={document.body}
                         className="react-select"
                         classNamePrefix="rs"
                         styles={{ container: (b) => ({ ...b, flex: 1 }) }}
@@ -601,6 +607,9 @@ const Backtest = () => {
                     value={selectedGroup ? { value: selectedGroup, label: groups.find(g => g.id === selectedGroup)?.name || selectedGroup } : null}
                     onChange={(o) => setSelectedGroup(o?.value || '')}
                     isClearable
+                    isLoading={groups.length === 0}
+                    loadingMessage={() => '正在加载…'}
+                    menuPortalTarget={document.body}
                     className="react-select"
                     classNamePrefix="rs"
                   />
@@ -611,7 +620,7 @@ const Backtest = () => {
             {/* ====================================================== */}
             {/*  Common fields                                          */}
             {/* ====================================================== */}
-
+ 
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label" htmlFor="strategy-select">
@@ -624,6 +633,9 @@ const Backtest = () => {
                   value={selectedStrategy ? { value: selectedStrategy, label: selectedStrategy } : null}
                   onChange={(o) => setSelectedStrategy(o?.value || '')}
                   isClearable
+                  isLoading={strategies.length === 0}
+                  loadingMessage={() => '正在加载…'}
+                  menuPortalTarget={document.body}
                   className="react-select"
                   classNamePrefix="rs"
                 />
@@ -639,6 +651,7 @@ const Backtest = () => {
                   options={PERIODS}
                   value={PERIODS.find(p => p.value === selectedPeriod) || null}
                   onChange={(o) => setSelectedPeriod(o?.value || '')}
+                  menuPortalTarget={document.body}
                   className="react-select"
                   classNamePrefix="rs"
                 />
@@ -654,6 +667,9 @@ const Backtest = () => {
                   options={datasources.map(ds => ({ value: ds, label: ds }))}
                   value={selectedDatasource ? { value: selectedDatasource, label: selectedDatasource } : null}
                   onChange={(o) => setSelectedDatasource(o?.value || '')}
+                  isLoading={datasources.length === 0}
+                  loadingMessage={() => '正在加载…'}
+                  menuPortalTarget={document.body}
                   className="react-select"
                   classNamePrefix="rs"
                 />

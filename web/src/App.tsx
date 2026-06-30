@@ -1,12 +1,12 @@
 import { Routes, Route } from 'react-router-dom'
-import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
-import Analyze from './pages/Analyze'
-import Backtest from './pages/Backtest'
-import Portfolio from './pages/Portfolio'
-import AIStrategy from './pages/AIStrategy'
-import Bars from './pages/Bars'
-import Groups from './pages/Groups'
+import Layout from '@/components/Layout'
+import Dashboard from '@/pages/Dashboard'
+import Analyze from '@/pages/Analyze'
+import Backtest from '@/pages/Backtest'
+import Portfolio from '@/pages/Portfolio'
+import AIStrategy from '@/pages/AIStrategy'
+import Bars from '@/pages/Bars'
+import Groups from '@/pages/Groups'
 
 export default function App() {
   return (

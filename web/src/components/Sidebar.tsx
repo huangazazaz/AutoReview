@@ -46,8 +46,7 @@ const svgIcons: Record<string, JSX.Element> = {
   ),
   portfolio: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 3v18h18"/>
-      <path d="M7 16l4-6 4 3 3-5"/>
+      <path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 3-5"/>
       <circle cx="7" cy="16" r="1" fill="currentColor" fillOpacity="0.5"/>
       <circle cx="17" cy="8" r="1" fill="currentColor" fillOpacity="0.5"/>
     </svg>
@@ -55,18 +54,17 @@ const svgIcons: Record<string, JSX.Element> = {
   ai: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2a4 4 0 0 1 4 4v1h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2V6a4 4 0 0 1 4-4Z"/>
-      <circle cx="12" cy="14" r="2" fill="currentColor" fillOpacity="0.5"/>
-      <path d="M12 3v3"/>
+      <circle cx="12" cy="14" r="2" fill="currentColor" fillOpacity="0.5"/><path d="M12 3v3"/>
     </svg>
   ),
 }
 
 export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
-  const className = 'sidebar' + (mobileOpen ? ' open' : '')
+  const sidebarClass = 'sidebar' + (mobileOpen ? ' open' : '')
 
   return (
-    <aside className={className} id="sidebar">
-      {/* 品牌区域 — 增强发光效果 */}
+    <aside className={sidebarClass} id="sidebar">
+      {/* 品牌区域 */}
       <div className="sidebar-brand" style={{
         background: 'linear-gradient(180deg, rgba(139,92,246,0.08) 0%, transparent 100%)',
       }}>
@@ -99,7 +97,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         ))}
       </nav>
 
-      {/* 底部信息 — 带渐变分割线 */}
+      {/* 底部信息 */}
       <div className="sidebar-footer" style={{
         borderTop: '1px solid transparent',
         borderImage: 'linear-gradient(90deg, transparent 0%, var(--border-light) 20%, var(--border-light) 80%, transparent 100%) 1',

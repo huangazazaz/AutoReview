@@ -1165,35 +1165,38 @@ def api_cache_stocks(
         return {"symbols": all_stocks}
 # 注意：必须在所有 API 路由之后注册，否则会拦截 API 请求
 
-# 优先使用 React 构建产物 (web/dist)，回退到旧前端 (frontend)
-_frontend_dir = Path(__file__).resolve().parent.parent.parent / "web" / "dist"
-if not _frontend_dir.exists():
-    _frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
+# 前端策略：React 构建的 SPA（完整应用）优先，旧前端作为备用
+_frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
+_react_dir = Path(__file__).resolve().parent.parent.parent / "web" / "dist"
 
-if _frontend_dir.exists():
-    from fastapi.responses import FileResponse
-    from starlette.middleware.base import BaseHTTPMiddleware
+if _react_dir.exists():
+    from fastapi.responses import FileResponse, Response
     import mimetypes
 
-    class SPAMiddleware(BaseHTTPMiddleware):
-        """Serve static files and fall back to index.html for SPA routes."""
-        async def dispatch(self, request, call_next):
-            # Let API routes handle their own requests
-            response = await call_next(request)
-            if response.status_code != 404:
-                return response
+    # React SPA 静态资源（JS/CSS/图片等）
+    @app.get("/assets/{rest:path}")
+    async def serve_react_assets(rest: str):
+        requested = _react_dir / "assets" / rest
+        if requested.exists() and requested.is_file():
+            mt, _ = mimetypes.guess_type(str(requested))
+            return FileResponse(requested, media_type=mt or "application/octet-stream")
+        return Response(status_code=404)
 
-            # For 404 responses, try serving a static file or index.html
-            path = request.url.path.lstrip("/")
-            requested_path = _frontend_dir / path
-            if path and requested_path.exists() and requested_path.is_file():
-                media_type, _ = mimetypes.guess_type(str(requested_path))
-                return FileResponse(requested_path, media_type=media_type or "application/octet-stream")
+    # React SPA catch-all：所有非 API 路径返回 index.html
+    @app.get("/{rest:path}")
+    async def serve_react_spa(rest: str):
+        # Try serving a static file from dist first
+        requested = _react_dir / rest
+        if requested.exists() and requested.is_file():
+            mt, _ = mimetypes.guess_type(str(requested))
+            return FileResponse(requested, media_type=mt or "application/octet-stream")
+        # Otherwise return index.html for SPA routing
+        return FileResponse(_react_dir / "index.html")
 
-            index_path = _frontend_dir / "index.html"
-            if index_path.exists():
-                return FileResponse(index_path)
+    @app.get("/")
+    async def serve_react_root():
+        return FileResponse(_react_dir / "index.html")
 
-            return response
-
-    app.add_middleware(SPAMiddleware)
+elif _frontend_dir.exists():
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(_frontend_dir), html=True), name="frontend")

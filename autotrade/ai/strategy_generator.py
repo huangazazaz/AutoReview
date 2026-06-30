@@ -191,16 +191,9 @@ class StrategyGenerator:
             return {"error": "AI 服务暂时不可用，请稍后重试"}
 
         # Parse JSON — chat response format differs from generate()
-        try:
-            json_str = raw.strip()
-            if json_str.startswith("```"):
-                match = re.search(r"```(?:json)?\s*(.*?)\s*```", raw, re.DOTALL)
-                if match:
-                    json_str = match.group(1).strip()
-            parsed = json.loads(json_str)
-        except json.JSONDecodeError as e:
-            logger.warning("Failed to parse AI chat response as JSON: %s", e)
-            return {"error": "AI 返回格式异常，请重试", "raw": raw}
+        parsed = self._extract_json(raw)
+        if "error" in parsed:
+            return parsed
 
         # Validate action field
         action = parsed.get("action", "chat")
@@ -254,9 +247,12 @@ class StrategyGenerator:
     def _build_prompt(self, user_prompt: str) -> str:
         return STRATEGY_GEN_PROMPT.format(user_prompt=user_prompt)
 
-    def _parse_response(self, raw: str) -> dict:
-        """Parse the AI response as JSON."""
-        # Try to extract JSON block if wrapped in markdown
+    def _extract_json(self, raw: str) -> dict:
+        """Extract JSON from raw AI response, stripping markdown fences.
+
+        Returns a dict on success, or a dict with 'error' and 'raw' keys on failure.
+        Guards against AI returning a non-dict (e.g. JSON array).
+        """
         json_str = raw.strip()
         if json_str.startswith("```"):
             # Extract from ```json ... ``` block
@@ -268,6 +264,17 @@ class StrategyGenerator:
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse AI response as JSON: %s", e)
             return {"error": "AI 返回格式异常，请重试", "raw": raw}
+
+        if not isinstance(data, dict):
+            return {"error": "AI 返回格式异常", "raw": raw}
+
+        return data
+
+    def _parse_response(self, raw: str) -> dict:
+        """Parse the AI response as JSON and validate required fields."""
+        data = self._extract_json(raw)
+        if "error" in data:
+            return data
 
         # Check required fields
         required = ["name", "display_name", "description", "python_code", "yaml_code", "reasoning"]

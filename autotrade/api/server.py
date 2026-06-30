@@ -386,11 +386,14 @@ def api_chat(req: ChatRequest):
         content=req.prompt,
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
+    # Snapshot prior messages BEFORE adding the new one to prevent race
+    # conditions when concurrent requests target the same session.
+    prior_messages = list(session.messages)
     _session_store.add_message(session_id, user_msg)
 
     # Build conversation history for AI
     history = []
-    for m in session.messages[:-1]:  # Exclude the just-added user message
+    for m in prior_messages:
         msg_dict = {"role": m.role, "content": m.content}
         if m.strategy:
             msg_dict["strategy"] = m.strategy

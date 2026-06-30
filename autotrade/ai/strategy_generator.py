@@ -227,13 +227,18 @@ class StrategyGenerator:
         """Build the chat prompt with conversation history context."""
         # Format history as readable text, compressing strategy code for token efficiency
         history_lines = []
-        for i, msg in enumerate(conversation_history[-20:]):  # Last 20 rounds
+        history_slice = conversation_history[-20:]  # Last 20 rounds
+        for i, msg in enumerate(history_slice):
             role_label = "用户" if msg["role"] == "user" else "AI"
             content = msg.get("content", "")
-            # Truncate long strategy code in assistant messages to save tokens
+            # For the latest strategy (last assistant message with code), keep FULL code
+            # For older strategies, truncate at 500 chars
             if msg["role"] == "assistant" and msg.get("strategy") and msg["strategy"].get("python_code"):
                 code = msg["strategy"]["python_code"]
-                if len(code) > 500:
+                is_latest_strategy = (i == len(history_slice) - 1 or
+                    not any(m.get("strategy") and m.get("strategy", {}).get("python_code")
+                            for m in history_slice[i+1:]))
+                if not is_latest_strategy and len(code) > 500:
                     code = code[:500] + "\n# ... (truncated)"
                 history_lines.append(f"[{role_label}]: {content}\n[策略代码]:\n```python\n{code}\n```")
             else:

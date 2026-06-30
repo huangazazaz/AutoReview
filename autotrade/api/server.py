@@ -44,6 +44,23 @@ from autotrade.ai.session_store import SessionStore, ChatMessage as StoreChatMes
 # Session store singleton
 _session_store = SessionStore(ttl_seconds=7200)
 
+import threading
+
+def _start_session_cleanup():
+    """Background thread that periodically cleans expired sessions."""
+    import time
+    while True:
+        time.sleep(1800)  # 30 minutes
+        try:
+            removed = _session_store.cleanup_expired()
+            if removed > 0:
+                logger.info("Cleaned up %d expired session(s)", removed)
+        except Exception as e:
+            logger.warning("Session cleanup error: %s", e)
+
+_cleanup_thread = threading.Thread(target=_start_session_cleanup, daemon=True)
+_cleanup_thread.start()
+
 # ---- FastAPI 应用 ----
 app = FastAPI(
     title="AutoTrade",

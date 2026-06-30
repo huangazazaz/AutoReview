@@ -1169,5 +1169,21 @@ def api_cache_stocks(
 _frontend_dir = Path(__file__).resolve().parent.parent.parent / "web" / "dist"
 if not _frontend_dir.exists():
     _frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
+
 if _frontend_dir.exists():
+    from fastapi.responses import FileResponse
+
+    # SPA fallback: serve index.html for any non-API path
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        index_path = _frontend_dir / "index.html"
+        if index_path.exists():
+            # Check if the requested file exists as a static asset
+            requested_path = _frontend_dir / full_path
+            if full_path and requested_path.exists() and requested_path.is_file():
+                return FileResponse(requested_path)
+            return FileResponse(index_path)
+        return {"detail": "Frontend not found"}
+
+    # Also mount static files for direct asset access
     app.mount("/", StaticFiles(directory=str(_frontend_dir), html=True), name="frontend")

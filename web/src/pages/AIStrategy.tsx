@@ -19,6 +19,7 @@ export default function AIStrategy() {
   const [sending, setSending] = useState(false)
   const [nextId, setNextId] = useState(1)
   const [codeExpanded, setCodeExpanded] = useState<Record<number, boolean>>({})
+  const [exampleFillText, setExampleFillText] = useState('')
 
   // Load active session on mount
   const initialLoadDone = useRef(false)
@@ -129,6 +130,11 @@ export default function AIStrategy() {
     localStorage.removeItem('ai_chat_active_session')
   }, [])
 
+  const handlePromptFill = useCallback((text: string) => {
+    handleNewSession()
+    setExampleFillText(text)
+  }, [handleNewSession])
+
   const handleSelectSession = useCallback((sessionId: string) => {
     if (sessionId === activeSessionId) return
     loadSession(sessionId)
@@ -177,9 +183,13 @@ export default function AIStrategy() {
     setCodeExpanded(prev => ({ ...prev, [messageId]: !prev[messageId] }))
   }, [])
 
-  const handleCopy = useCallback((code: string) => {
-    navigator.clipboard.writeText(code)
-    showToast('已复制代码', 'info')
+  const handleCopy = useCallback(async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code)
+      showToast('已复制代码', 'info')
+    } catch {
+      // clipboard write failed; silently ignore
+    }
   }, [])
 
   return (
@@ -199,6 +209,7 @@ export default function AIStrategy() {
           onSelect={handleSelectSession}
           onNew={handleNewSession}
           onDelete={handleDeleteSession}
+          onPromptFill={handlePromptFill}
         />
 
         {/* 右侧：对话区 */}
@@ -232,6 +243,8 @@ export default function AIStrategy() {
           onEndDateChange={setEndDate}
           onSend={handleSend}
           disabled={sending}
+          fillText={exampleFillText}
+          onFillConsumed={() => setExampleFillText('')}
         />
       </div>
     </div>

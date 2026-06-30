@@ -26,7 +26,7 @@ export default function ChatMessages({
   }, [messages, sending])
 
   return (
-    <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
+    <div style={{ flex: 1 }}>
       {messages.length === 0 && !sending ? (
         <div className="empty-state-enhanced" style={{ marginTop: 60 }}>
           <div className="empty-icon-bg">

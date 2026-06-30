@@ -1,4 +1,4 @@
-import { useState, useCallback, type KeyboardEvent } from 'react'
+import { useState, useCallback, useEffect, useRef, type KeyboardEvent } from 'react'
 
 interface ChatInputProps {
   symbol: string
@@ -9,14 +9,25 @@ interface ChatInputProps {
   onEndDateChange: (d: string) => void
   onSend: (text: string) => void
   disabled: boolean
+  fillText?: string
+  onFillConsumed?: () => void
 }
 
 export default function ChatInput({
   symbol, startDate, endDate,
   onSymbolChange, onStartDateChange, onEndDateChange,
-  onSend, disabled,
+  onSend, disabled, fillText, onFillConsumed,
 }: ChatInputProps) {
   const [input, setInput] = useState('')
+  const consumedRef = useRef<string | undefined>()
+
+  useEffect(() => {
+    if (fillText && fillText !== consumedRef.current) {
+      consumedRef.current = fillText
+      setInput(fillText)
+      onFillConsumed?.()
+    }
+  }, [fillText, onFillConsumed])
 
   const handleSend = useCallback(() => {
     const text = input.trim()

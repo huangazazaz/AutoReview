@@ -6,6 +6,7 @@ interface ChatSessionListProps {
   onSelect: (sessionId: string) => void
   onNew: () => void
   onDelete: (sessionId: string) => void
+  onPromptFill?: (text: string) => void
 }
 
 const EXAMPLE_PROMPTS = [
@@ -17,7 +18,7 @@ const EXAMPLE_PROMPTS = [
 ]
 
 export default function ChatSessionList({
-  sessions, activeSessionId, onSelect, onNew, onDelete,
+  sessions, activeSessionId, onSelect, onNew, onDelete, onPromptFill,
 }: ChatSessionListProps) {
   return (
     <div className="card card-accent" style={{
@@ -85,7 +86,7 @@ export default function ChatSessionList({
                 padding: '8px 10px', lineHeight: 1.5,
                 border: '1px solid var(--border-light)', borderRadius: 'var(--radius)',
               }}
-              onClick={() => onNew()}>
+              onClick={() => { onNew(); onPromptFill?.(p.text) }}>
               <span style={{ marginRight: 6 }}>{p.icon}</span>{p.text}
             </button>
           ))}

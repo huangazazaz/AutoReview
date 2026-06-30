@@ -66,8 +66,13 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
   return (
     <aside className={className} id="sidebar">
-      <div className="sidebar-brand">
-        <span className="brand-icon">
+      {/* 品牌区域 — 增强发光效果 */}
+      <div className="sidebar-brand" style={{
+        background: 'linear-gradient(180deg, rgba(139,92,246,0.08) 0%, transparent 100%)',
+      }}>
+        <span className="brand-icon" style={{
+          boxShadow: '0 0 20px rgba(245,158,11,0.2), 0 0 40px rgba(245,158,11,0.08)',
+        }}>
           <svg className="icon brand-logo" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="2" y="4" width="20" height="16" rx="3" fill="currentColor" fillOpacity="0.12"/>
             <polyline points="7 17 10 10 13 14 16 7 18 11"/>
@@ -77,6 +82,8 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         </span>
         <span className="brand-text">AutoTrade</span>
       </div>
+
+      {/* 导航区域 */}
       <nav className="sidebar-nav">
         {navItems.map(item => (
           <NavLink
@@ -91,8 +98,17 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-footer">
-        <span className="version"><span className="version-text">v0.1.0</span></span>
+
+      {/* 底部信息 — 带渐变分割线 */}
+      <div className="sidebar-footer" style={{
+        borderTop: '1px solid transparent',
+        borderImage: 'linear-gradient(90deg, transparent 0%, var(--border-light) 20%, var(--border-light) 80%, transparent 100%) 1',
+      }}>
+        <span className="version">
+          <span className="version-text">v0.1.0</span>
+          <span style={{ margin: '0 6px', color: 'var(--border)' }}>·</span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>dev/autotrade-mvp</span>
+        </span>
       </div>
     </aside>
   )

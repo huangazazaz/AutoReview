@@ -22,7 +22,6 @@ export default function Portfolio() {
   const [groups, setGroups] = useState<GroupInfo[]>([])
   const [result, setResult] = useState<PortfolioBacktestResponse | null>(null)
 
-  // Strategy params
   const [paramSchema, setParamSchema] = useState<Record<string, { default?: unknown; type?: string }>>({})
   const [editParams, setEditParams] = useState<Record<string, string>>({})
   const [paramsExpanded, setParamsExpanded] = useState(false)
@@ -104,10 +103,17 @@ export default function Portfolio() {
 
   return (
     <>
-      <PageHeader title="组合回测" subtitle="单账户多持仓 + 股票筛选 + 策略择时，模拟真实账户收益" />
+      {/* 英雄区 */}
+      <div className="page-hero">
+        <PageHeader title="组合回测" subtitle="单账户多持仓 + 股票筛选 + 策略择时，模拟真实账户收益" />
+      </div>
 
-      <div className="card">
-        <div className="card-header"><span className="card-title">回测参数</span></div>
+      <div className="card card-accent" style={{ borderTop: '2px solid rgba(139,92,246,0.3)' }}>
+        <div className="card-header">
+          <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: 'var(--accent)' }}>⚙</span> 回测参数
+          </span>
+        </div>
         <div className="card-body">
           <div className="form-row">
             <div className="form-group">
@@ -118,47 +124,56 @@ export default function Portfolio() {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="pf-strategy">择时策略 <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 11 }}>(可选)</span></label>
+              <label className="form-label" htmlFor="pf-strategy">
+                择时策略 <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 11 }}>(可选)</span>
+              </label>
               <select className="form-select" id="pf-strategy" value={strategy} onChange={e => setStrategy(e.target.value)}>
                 <option value="">— 纯 Screener 模式 —</option>
                 {strategies.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
               </select>
             </div>
-          <div className="tabs" style={{ marginBottom: 12 }}>
+          </div>
+
+          <div className="tabs" style={{ marginBottom: 16 }}>
             <button className={'tab' + (inputMode === 'symbols' ? ' active' : '')} onClick={() => setInputMode('symbols')}>按代码</button>
             <button className={'tab' + (inputMode === 'group' ? ' active' : '')} onClick={() => setInputMode('group')}>按分组</button>
           </div>
 
-          {inputMode === 'symbols' ? (
-            <div className="form-group">
-              <label className="form-label" htmlFor="pf-symbols">股票代码</label>
-              <input type="text" className="form-input" id="pf-symbols"
-                placeholder="逗号分隔，或输入 'all' 全市场"
-                value={symbols} onChange={e => setSymbols(e.target.value)} />
-            </div>
-          ) : (
-            <div className="form-group">
-              <label className="form-label" htmlFor="pf-group">选择分组</label>
-              <select className="form-select" id="pf-group" value={group} onChange={e => setGroup(e.target.value)}>
-                <option value="">— 选择分组 —</option>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name} ({g.symbols.length} 只)</option>)}
-              </select>
-            </div>
-          )}
+          <div className="form-row">
+            {inputMode === 'symbols' ? (
+              <div className="form-group" style={{ flex: 2 }}>
+                <label className="form-label" htmlFor="pf-symbols">股票代码</label>
+                <input type="text" className="form-input" id="pf-symbols"
+                  placeholder="逗号分隔，或输入 'all' 全市场"
+                  value={symbols} onChange={e => setSymbols(e.target.value)} />
+              </div>
+            ) : (
+              <div className="form-group" style={{ flex: 2 }}>
+                <label className="form-label" htmlFor="pf-group">选择分组</label>
+                <select className="form-select" id="pf-group" value={group} onChange={e => setGroup(e.target.value)}>
+                  <option value="">— 选择分组 —</option>
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name} ({g.symbols.length} 只)</option>)}
+                </select>
+              </div>
+            )}
             <div className="form-group" style={{ minWidth: 280 }}>
               <label className="form-label">日期范围</label>
               <DateRangeInput startDate={startDate} endDate={endDate}
                 onChange={(s, e) => { setStartDate(s); setEndDate(e) }} />
             </div>
             <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={submit} disabled={submitting}>
+              <button className="btn btn-primary" style={{
+                width: '100%', minWidth: 140,
+                background: submitting ? undefined : 'var(--gradient-brand)',
+                border: submitting ? undefined : 'none',
+              }} onClick={submit} disabled={submitting}>
                 {submitting ? '⏳ 回测中...' : '🚀 开始组合回测'}
               </button>
             </div>
           </div>
 
           {hasParams && (
-            <div className="params-section">
+            <div className="params-section" style={{ marginTop: 16 }}>
               <button type="button" className="params-toggle"
                 onClick={() => setParamsExpanded(!paramsExpanded)} aria-expanded={paramsExpanded}>
                 <span className="toggle-icon">{paramsExpanded ? '▼' : '▶'}</span> {strategy} 策略参数
@@ -215,7 +230,21 @@ function PortfolioResult({ result, screener, strategy }: {
 }) {
   const m = result.metrics
   if (!m || Object.keys(m).length === 0) {
-    return <div className="card"><div className="card-body"><div className="empty-state"><p>无回测结果</p></div></div></div>
+    return (
+      <div className="card card-accent" style={{ marginTop: 16 }}>
+        <div className="card-body">
+          <div className="empty-state-enhanced">
+            <div className="empty-icon-bg">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 3-5"/>
+              </svg>
+            </div>
+            <div className="empty-title">无回测结果</div>
+            <div className="empty-desc">请检查回测参数后重试</div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const isProfitable = m.total_return_pct >= 0
@@ -223,30 +252,30 @@ function PortfolioResult({ result, screener, strategy }: {
 
   return (
     <>
-      <div className="stats-grid" style={{ marginTop: 16 }}>
-        <div className="stat-card">
-          <div className="stat-label">回测模式</div>
-          <div className="stat-value stat-neutral" style={{ fontSize: 14 }}>{mode}</div>
+      <div className="stats-grid" style={{ marginTop: 20 }}>
+        <div className="stat-card" style={{ borderTop: '2px solid var(--info)' }}>
+          <div className="stat-label">🔧 回测模式</div>
+          <div className="stat-value stat-neutral" style={{ fontSize: 13, fontFamily: 'var(--font-sans)' }}>{mode}</div>
           <div className="stat-sub">{result.trade_count} 笔交易</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">初始资金 → 最终权益</div>
+        <div className="stat-card" style={{ borderTop: `2px solid ${isProfitable ? 'var(--buy)' : 'var(--sell)'}` }}>
+          <div className="stat-label">💰 初始资金 → 最终权益</div>
           <div className="stat-value stat-neutral" style={{ fontSize: 18 }}>
-            {formatAmount(m.initial_capital)} → {formatAmount(m.final_equity)}
+            {formatAmount(m.initial_capital)} <span style={{ color: 'var(--text-muted)', fontSize: 14 }}>→</span> {formatAmount(m.final_equity)}
           </div>
           <div className="stat-sub" style={{ color: isProfitable ? 'var(--buy)' : 'var(--sell)' }}>
-            {isProfitable ? '盈利' : '亏损'} {formatAmount(Math.abs(m.final_equity - m.initial_capital))}
+            {isProfitable ? '🟢 盈利' : '🔴 亏损'} {formatAmount(Math.abs(m.final_equity - m.initial_capital))}
           </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">总收益率</div>
+        <div className="stat-card" style={{ borderTop: `2px solid ${isProfitable ? 'var(--buy)' : 'var(--sell)'}` }}>
+          <div className="stat-label">📈 总收益率</div>
           <div className={'stat-value ' + (isProfitable ? 'stat-positive' : 'stat-negative')}>
             {formatPct(m.total_return_pct)}
           </div>
           <div className="stat-sub">最大回撤 {formatPct(m.max_drawdown_pct)}</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label">胜率 / 夏普比率</div>
+        <div className="stat-card" style={{ borderTop: '2px solid var(--accent)' }}>
+          <div className="stat-label">🎯 胜率 / ⚡ 夏普比率</div>
           <div className="stat-value stat-neutral" style={{ fontSize: 20 }}>
             {formatPct(m.win_rate)} <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>/</span> {formatNumber(m.sharpe_ratio, 3)}
           </div>
@@ -254,15 +283,29 @@ function PortfolioResult({ result, screener, strategy }: {
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="card-header"><span className="card-title">详细指标</span></div>
+      <div className="card card-accent" style={{ marginTop: 16, borderTop: '2px solid rgba(59,130,246,0.3)' }}>
+        <div className="card-header">
+          <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: 'var(--info)' }}>📊</span> 详细指标
+          </span>
+        </div>
         <div className="card-body">
           <div className="param-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
             {Object.entries(m).map(([key, val]) => (
               <div key={key} className="param-item">
                 <label className="param-label">{key}</label>
-                <div className="form-input" style={{ background: 'var(--bg-card-hover)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', fontSize: 13 }}>
-                  {typeof val === 'number' ? (key.includes('pct') || key.includes('rate') ? formatPct(val) : key.includes('capital') || key.includes('equity') ? formatAmount(val) : formatNumber(val, 4)) : String(val)}
+                <div style={{
+                  background: 'var(--bg-card-hover)', padding: '8px 12px',
+                  borderRadius: 'var(--radius-sm)', fontSize: 13,
+                  fontFamily: 'var(--font-mono)', border: '1px solid var(--border-light)',
+                }}>
+                  {typeof val === 'number'
+                    ? (key.includes('pct') || key.includes('rate')
+                      ? formatPct(val)
+                      : key.includes('capital') || key.includes('equity')
+                        ? formatAmount(val)
+                        : formatNumber(val, 4))
+                    : String(val)}
                 </div>
               </div>
             ))}
@@ -271,9 +314,9 @@ function PortfolioResult({ result, screener, strategy }: {
       </div>
 
       {result.output_dir && (
-        <div className="card" style={{ marginTop: 8 }}>
-          <div className="card-body" style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-muted)' }}>
-            💾 结果已保存到: <code style={{ color: 'var(--text-primary)' }}>{result.output_dir}</code>
+        <div className="card card-gradient" style={{ marginTop: 8 }}>
+          <div className="card-body" style={{ padding: '12px 16px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>💾</span> 结果已保存到: <code style={{ color: 'var(--text-primary)', background: 'var(--bg-input)', padding: '2px 8px' }}>{result.output_dir}</code>
           </div>
         </div>
       )}

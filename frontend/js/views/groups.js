@@ -14,22 +14,29 @@
         const File = _.folder || (() => '');
 
         container.innerHTML = `
-            <div class="page-header" style="display:flex; align-items:center; justify-content:space-between;">
-                <div>
-                    <h1 class="page-title">${Folder({ size: 24 })} 分组管理</h1>
-                    <p class="page-subtitle">创建和管理股票分组，用于批量回测</p>
+            <div class="page-hero">
+                <div class="page-header" style="display:flex; align-items:center; justify-content:space-between;margin-bottom:0;">
+                    <div>
+                        <h1 class="page-title" style="display:flex;align-items:center;gap:var(--space-3);">
+                            <span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:var(--radius);background:var(--gradient-brand);color:#fff;">${Folder({ size: 22, class: '' })}</span>
+                            分组管理
+                        </h1>
+                        <p class="page-subtitle" style="margin-top:4px;">创建和管理股票分组，用于批量回测</p>
+                    </div>
+                    <button class="btn btn-primary" id="groups-create-btn" style="flex-shrink:0;">
+                        ${Plus({ size: 18 })} 新建分组
+                    </button>
                 </div>
-                <button class="btn btn-primary" id="groups-create-btn">
-                    ${Plus({ size: 18 })} 新建分组
-                </button>
             </div>
 
             <div class="split-layout">
                 <!-- 左侧：分组列表 -->
                 <div class="split-left">
-                    <div class="card">
+                    <div class="card card-accent" style="border-top:2px solid rgba(139,92,246,0.3);">
                         <div class="card-header">
-                            <span class="card-title">分组列表</span>
+                            <span class="card-title" style="display:flex;align-items:center;gap:var(--space-2);">
+                                <span style="color:var(--accent);">📁</span> 分组列表
+                            </span>
                         </div>
                         <div class="card-body" id="groups-list">
                             <span style="color:var(--text-muted);">加载中...</span>
@@ -39,11 +46,12 @@
 
                 <!-- 右侧：分组详情 -->
                 <div class="split-right">
-                    <div class="card" id="groups-detail-card">
+                    <div class="card card-accent" id="groups-detail-card" style="border-top:2px solid rgba(59,130,246,0.3);">
                         <div class="card-body">
-                            <div class="empty-state">
-                                <span class="empty-icon">${ArrowLeft({ size: 48 })}</span>
-                                <p>请从左侧选择一个分组</p>
+                            <div class="empty-state-enhanced">
+                                <div class="empty-icon-bg">${ArrowLeft({ size: 32 })}</div>
+                                <div class="empty-title">选择一个分组</div>
+                                <div class="empty-desc">请从左侧列表选择一个分组查看或编辑</div>
                             </div>
                         </div>
                     </div>

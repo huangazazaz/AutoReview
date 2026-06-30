@@ -20,15 +20,22 @@
         }
 
         container.innerHTML = `
-            <div class="page-header">
-                <h1 class="page-title">${Candlestick({ size: 24 })} K线数据</h1>
-                <p class="page-subtitle">查询股票日线 OHLCV 数据，可视化蜡烛图</p>
+            <div class="page-hero">
+                <div class="page-header" style="margin-bottom:0;">
+                    <h1 class="page-title" style="display:flex;align-items:center;gap:var(--space-3);">
+                        <span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:var(--radius);background:var(--gradient-accent);color:#fff;">${Candlestick({ size: 22, class: '' })}</span>
+                        K线数据
+                    </h1>
+                    <p class="page-subtitle" style="margin-top:4px;">查询股票日线 OHLCV 数据，可视化蜡烛图</p>
+                </div>
             </div>
 
             <!-- 表单 -->
-            <div class="card">
+            <div class="card card-accent">
                 <div class="card-header">
-                    <span class="card-title">查询参数</span>
+                    <span class="card-title" style="display:flex;align-items:center;gap:var(--space-2);">
+                        <span style="color:var(--accent);">⚙</span> 查询参数
+                    </span>
                 </div>
                 <div class="card-body">
                     <div class="form-row">
@@ -158,23 +165,46 @@
                 ? `${escapeHtml(data.symbol)} <span style="color:var(--text-secondary);font-weight:400;">${escapeHtml(data.stock_name)}</span>`
                 : escapeHtml(data.symbol);
             infoEl.innerHTML = `
-                <div class="info-banner" role="status">
-                    <strong>${stockLabel}</strong> |
-                    共 <strong>${count}</strong> 条 |
-                    ${escapeHtml(data.start)} ~ ${escapeHtml(data.end)}
-                </div>
-                <!-- 数值摘要面板 — 色盲友好（点击K线可切换查看日期） -->
+                <div class="card card-gradient" role="status" style="margin:var(--space-4) 0;padding:var(--space-4);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--space-3);">
+                        <div style="display:flex;align-items:center;gap:var(--space-3);">
+                            <span style="display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:${isUp ? 'var(--buy-bg)' : 'var(--sell-bg)'};color:${isUp ? 'var(--buy)' : 'var(--sell)'};">${isUp ? TrendingUp({ size: 20 }) : TrendingDown({ size: 20 })}</span>
+                            <strong style="font-size:16px;">${stockLabel}</strong>
+                        </div>
+                        <div class="kpi-row" style="padding:0;">
+                            <div class="kpi-item">
+                                <span class="kpi-label">最新价</span>
+                                <span class="kpi-value" style="color:${isUp ? 'var(--buy)' : 'var(--sell)'};">${formatNumber(latest.close, 2)}</span>
+                            </div>
+                            <div class="kpi-item">
+                                <span class="kpi-label">涨跌</span>
+                                <span class="kpi-value" style="color:${isUp ? 'var(--buy)' : 'var(--sell)'};">${isUp ? '+' : ''}${formatNumber(change, 2)} (${isUp ? '+' : ''}${formatNumber(changePct, 2)}%)</span>
+                            </div>
+                            <div class="kpi-item">
+                                <span class="kpi-label">最高 / 最低</span>
+                                <span class="kpi-value" style="font-size:16px;">${formatNumber(periodHigh, 2)} <span style="color:var(--text-muted);font-size:13px;">/</span> ${formatNumber(periodLow, 2)}</span>
+                            </div>
+                            <div class="kpi-item">
+                                <span class="kpi-label">数据条数</span>
+                                <span class="kpi-value" style="font-size:16px;">${count}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+
+            // 数值摘要面板 — 增强样式
+            document.getElementById('bars-info').innerHTML += `
                 <div class="stats-grid" id="bars-stats-grid" style="margin-bottom:var(--space-4);" role="status" aria-label="K线数值摘要">
-                    <div class="stat-card">
-                        <div class="stat-label" id="bars-stat-label-0">最新收盘</div>
+                    <div class="stat-card" style="border-top:2px solid ${isUp ? 'var(--buy)' : 'var(--sell)'};">
+                        <div class="stat-label" id="bars-stat-label-0">📊 最新收盘</div>
                         <div class="stat-value ${isUp ? 'stat-positive' : 'stat-negative'}" id="bars-stat-val-0">${formatNumber(latest.close, 2)}</div>
                         <div class="stat-sub" id="bars-stat-sub-0">
                             ${isUp ? TrendingUp({ size: 14 }) : TrendingDown({ size: 14 })}
                             ${isUp ? '+' : ''}${formatNumber(change, 2)} (${formatPct(changePct)})
                         </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label">期间最高 / 最低</div>
+                    <div class="stat-card" style="border-top:2px solid var(--primary);">
+                        <div class="stat-label">📈 期间最高 / 📉 最低</div>
                         <div class="stat-value stat-neutral" style="font-size:18px;" id="bars-stat-val-1">
                             <span style="color:var(--buy);">${formatNumber(periodHigh, 2)}</span>
                             <span style="color:var(--text-muted);"> / </span>
@@ -182,16 +212,16 @@
                         </div>
                         <div class="stat-sub" id="bars-stat-sub-1">区间振幅 ${formatPct((periodHigh - periodLow) / periodLow * 100)}</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label">开盘 / 最高 / 最低</div>
+                    <div class="stat-card" style="border-top:2px solid var(--info);">
+                        <div class="stat-label">📋 开盘 / 最高 / 最低</div>
                         <div class="stat-value stat-neutral" style="font-size:16px;" id="bars-stat-val-2">
                             开 ${formatNumber(latest.open, 2)} ·
                             高 ${formatNumber(latest.high, 2)} ·
                             低 ${formatNumber(latest.low, 2)}
                         </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label" id="bars-stat-label-3">成交量 / 成交额</div>
+                    <div class="stat-card" style="border-top:2px solid var(--accent);">
+                        <div class="stat-label" id="bars-stat-label-3">📦 成交量 / 成交额</div>
                         <div class="stat-value stat-neutral" style="font-size:16px;" id="bars-stat-val-3">
                             ${formatVolume(latest.volume)} · ${formatAmount(latest.amount)}
                         </div>
@@ -220,14 +250,14 @@
             // 关闭 if 块
         } else {
             document.getElementById('bars-info').innerHTML = `
-                <div class="error-banner" role="alert">
-                    未查询到 ${escapeHtml(data.symbol)} 的日线数据。${data.error ? escapeHtml(data.error) : ''}
+                <div class="error-banner" role="alert" style="margin:var(--space-4) 0;">
+                    ⚠️ 未查询到 ${escapeHtml(data.symbol)} 的日线数据。${data.error ? escapeHtml(data.error) : ''}
                 </div>`;
         }
 
         const chartDom = document.getElementById('bars-chart');
         if (count === 0) {
-            chartDom.innerHTML = `<div class="empty-state"><span class="empty-icon">${File({ size: 48 })}</span><p>无数据可显示</p></div>`;
+            chartDom.innerHTML = `<div class="empty-state-enhanced"><div class="empty-icon-bg">${File({ size: 32 })}</div><div class="empty-title">无数据可显示</div><div class="empty-desc">未查询到K线数据</div></div>`;
             document.getElementById('bars-table-container').innerHTML = '';
             return;
         }

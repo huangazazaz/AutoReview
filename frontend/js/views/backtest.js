@@ -18,15 +18,22 @@
         if (chartInstance) { chartInstance.dispose(); chartInstance = null; }
 
         container.innerHTML = `
-            <div class="page-header">
-                <h1 class="page-title">${Chart({ size: 24 })} 批量回测</h1>
-                <p class="page-subtitle">按分组或自定义股票列表批量运行策略，多维度对比收益率</p>
+            <div class="page-hero">
+                <div class="page-header" style="margin-bottom:0;">
+                    <h1 class="page-title" style="display:flex;align-items:center;gap:var(--space-3);">
+                        <span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:var(--radius);background:var(--gradient-brand);color:#fff;">${Chart({ size: 22, class: '' })}</span>
+                        批量回测
+                    </h1>
+                    <p class="page-subtitle" style="margin-top:4px;">按分组或自定义股票列表批量运行策略，多维度对比收益率</p>
+                </div>
             </div>
 
             <!-- 表单 -->
-            <div class="card">
+            <div class="card card-accent">
                 <div class="card-header">
-                    <span class="card-title">回测参数</span>
+                    <span class="card-title" style="display:flex;align-items:center;gap:var(--space-2);">
+                        <span style="color:var(--accent);">⚙</span> 回测参数
+                    </span>
                 </div>
                 <div class="card-body">
                     <!-- 输入模式切换 -->
@@ -358,35 +365,35 @@
         const worst = data.worst_symbol ? `${data.worst_symbol}${data.worst_return ? ' ' + formatPct(data.worst_return) : ''}` : '—';
 
         document.getElementById('bt-results').innerHTML = `
-            <!-- 汇总卡片 -->
+            <!-- 汇总卡片 — 增强样式 -->
             <div class="stats-grid" style="margin-top:var(--space-4);" role="status" aria-label="批量回测汇总">
-                <div class="stat-card">
-                    <div class="stat-label">股票总数 / 胜率</div>
+                <div class="stat-card" style="border-top:2px solid var(--info);">
+                    <div class="stat-label">📊 股票总数 / 胜率</div>
                     <div class="stat-value stat-neutral">
                         ${total}
                         <span style="font-size:14px;color:var(--text-muted);">只</span>
                     </div>
                     <div class="stat-sub">正收益占比 ${formatNumber(positivePct, 1)}%</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label">成功 / 失败</div>
+                <div class="stat-card" style="border-top:2px solid var(--accent);">
+                    <div class="stat-label">✅ 成功 / ❌ 失败</div>
                     <div class="stat-value stat-neutral">
                         ${data.success || 0}
                         <span style="font-size:16px;color:var(--text-muted);">/</span>
                         <span style="color:${(data.failed || 0) > 0 ? 'var(--error)' : 'inherit'}">${data.failed || 0}</span>
                     </div>
-                    <div class="stat-sub">正 <span style="color:var(--buy);">${data.positive_count || 0}</span> · 负 <span style="color:var(--sell);">${data.negative_count || 0}</span></div>
+                    <div class="stat-sub">正 <span style="color:var(--buy);font-weight:600;">${data.positive_count || 0}</span> · 负 <span style="color:var(--sell);font-weight:600;">${data.negative_count || 0}</span></div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label">平均收益率</div>
+                <div class="stat-card" style="border-top:2px solid ${avgReturn >= 0 ? 'var(--buy)' : 'var(--sell)'};">
+                    <div class="stat-label">📈 平均收益率</div>
                     <div class="stat-value ${avgReturn >= 0 ? 'stat-positive' : 'stat-negative'}">
                         ${formatPct(avgReturn)}
                     </div>
                     <div class="stat-sub">全部股票均值</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-label">最佳 / 最差</div>
-                    <div class="stat-value stat-neutral" style="font-size:16px;">
+                <div class="stat-card" style="border-top:2px solid var(--primary);">
+                    <div class="stat-label">🏆 最佳 / 📉 最差</div>
+                    <div class="stat-value stat-neutral" style="font-size:15px;">
                         <span style="color:var(--buy);">${escapeHtml(best)}</span>
                     </div>
                     <div class="stat-sub" style="color:var(--sell);">${escapeHtml(worst)}</div>
@@ -395,16 +402,20 @@
 
             <!-- 对比图表 + 表格 -->
             <div style="display:flex; gap:var(--space-5); flex-wrap:wrap;">
-                <div class="chart-container" id="bt-chart" role="img" aria-label="收益率对比柱状图"
-                    style="flex:1; min-width:380px; height:${Math.max(300, chartData.length * 36 + 80)}px;"></div>
+                <div class="card card-accent" style="flex:1; min-width:380px; padding:var(--space-3); border-top:2px solid rgba(139,92,246,0.3);">
+                    <div class="chart-container" id="bt-chart" role="img" aria-label="收益率对比柱状图"
+                        style="height:${Math.max(300, chartData.length * 36 + 80)}px; border:none; border-radius:0;"></div>
+                </div>
 
-                <div class="card" style="flex:2; min-width:500px;">
+                <div class="card card-accent" style="flex:2; min-width:500px; border-top:2px solid rgba(59,130,246,0.3);">
                     <div class="card-header">
-                        <span class="card-title">收益率排行</span>
+                        <span class="card-title" style="display:flex;align-items:center;gap:var(--space-2);">
+                            <span style="color:var(--primary);">🏆</span> 收益率排行
+                        </span>
                         <span style="font-size:12px;color:var(--text-muted);">点击表头排序 · 点击行查看详情</span>
                     </div>
                     <div class="card-body" style="padding:0;">
-                        ${chartData.length === 0 ? `<div class="empty-state"><span class="empty-icon">${File({ size: 48 })}</span><p>无结果</p></div>` : `
+                        ${chartData.length === 0 ? `<div class="empty-state-enhanced"><div class="empty-icon-bg">${File({ size: 32 })}</div><div class="empty-title">无回测结果</div><div class="empty-desc">请检查股票代码和策略配置</div></div>` : `
                         <div class="table-container" style="border:none;">
                             <table id="bt-results-table" aria-label="收益率排行榜">
                                 <thead>

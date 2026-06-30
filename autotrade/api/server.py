@@ -1174,24 +1174,21 @@ if _frontend_dir.exists():
     from fastapi.responses import FileResponse
     import mimetypes
 
-    # SPA fallback: serve static files + index.html for client-side routes
-    @app.get("/{full_path:path}")
-    async def spa_fallback(full_path: str):
-        # Serve existing static files directly (JS, CSS, images, etc.)
-        requested_path = _frontend_dir / full_path
-        if full_path and requested_path.exists() and requested_path.is_file():
+    # SPA fallback: serve static files, fall back to index.html for client-side routes
+    async def _serve_frontend(path: str) -> FileResponse:
+        requested_path = _frontend_dir / path
+        # Serve existing static files directly (JS, CSS, images, assets)
+        if path and requested_path.exists() and requested_path.is_file():
             media_type, _ = mimetypes.guess_type(str(requested_path))
             return FileResponse(requested_path, media_type=media_type or "application/octet-stream")
         # For all other paths, serve index.html (SPA client-side routing)
         index_path = _frontend_dir / "index.html"
-        if index_path.exists():
-            return FileResponse(index_path)
-        return {"detail": "Frontend not found"}
+        return FileResponse(index_path)
 
-    # Mount for root path to serve index.html
-    @app.get("/")
-    async def root():
-        index_path = _frontend_dir / "index.html"
-        if index_path.exists():
-            return FileResponse(index_path)
-        return {"detail": "Frontend not found"}
+    @app.get("/{path:path}", include_in_schema=False)
+    async def serve_frontend(path: str):
+        return await _serve_frontend(path)
+
+    @app.get("/", include_in_schema=False)
+    async def serve_root():
+        return await _serve_frontend("")

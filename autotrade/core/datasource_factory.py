@@ -96,6 +96,8 @@ def build_datasource_from_name(
     被 engine.analyze_stock / _resolve_symbols 调用，集中处理实例化分支。
     """
     resolved = name or FAILOVER_NAME
+    if resolved == "auto":
+        resolved = FAILOVER_NAME
     if resolved == FAILOVER_NAME:
         return build_failover_datasource(config)
     return build_datasource(resolved, config)

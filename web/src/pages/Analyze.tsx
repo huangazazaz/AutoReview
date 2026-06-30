@@ -276,7 +276,7 @@ export default function Analyze() {
   const [symbol, setSymbol] = useState('')
   const [strategyName, setStrategyName] = useState('')
   const [period, setPeriod] = useState('1y')
-  const [datasource, setDatasource] = useState('auto')
+  const [datasource, setDatasource] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [strategyParams, setStrategyParams] = useState<Record<string, string>>({})
@@ -369,7 +369,7 @@ export default function Analyze() {
           symbol: trimmedSymbol,
           strategy: strategyName || undefined,
           period: period || undefined,
-          datasource: datasource || 'auto',
+          datasource: datasource || '',
           start: startDate || undefined,
           end: endDate || undefined,
           strategy_params: Object.keys(strategyParams).length > 0 ? strategyParams : undefined,

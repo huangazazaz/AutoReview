@@ -61,28 +61,28 @@ class TurtleTraderStrategy(Strategy):
         use_trailing_profit: bool = False,
         trailing_profit_pct: float = 0.05,
     ):
-        self.system1_entry = system1_entry
-        self.system1_exit = system1_exit
-        self.system2_entry = system2_entry
-        self.system2_exit = system2_exit
-        self.use_system1 = use_system1
-        self.use_system2 = use_system2
-        self.atr_period = atr_period
-        self.account_risk_pct = account_risk_pct
-        self.max_units = max_units
-        self.pyramid_atr_mult = pyramid_atr_mult
-        self.stop_atr_mult = stop_atr_mult
-        self.allow_long = allow_long
-        self.allow_short = allow_short
-        self.skip_if_last_win_sys1 = skip_if_last_win_sys1
-        self.use_trend_filter = use_trend_filter
-        self.trend_ma_fast = trend_ma_fast
-        self.trend_ma_slow = trend_ma_slow
-        self.use_volume_filter = use_volume_filter
-        self.volume_ma_period = volume_ma_period
-        self.volume_mult = volume_mult
-        self.use_trailing_profit = use_trailing_profit
-        self.trailing_profit_pct = trailing_profit_pct
+        self.system1_entry = int(system1_entry)
+        self.system1_exit = int(system1_exit)
+        self.system2_entry = int(system2_entry)
+        self.system2_exit = int(system2_exit)
+        self.use_system1 = int(use_system1)
+        self.use_system2 = int(use_system2)
+        self.atr_period = int(atr_period)
+        self.account_risk_pct = float(account_risk_pct)
+        self.max_units = int(max_units)
+        self.pyramid_atr_mult = float(pyramid_atr_mult)
+        self.stop_atr_mult = float(stop_atr_mult)
+        self.allow_long = int(allow_long)
+        self.allow_short = int(allow_short)
+        self.skip_if_last_win_sys1 = int(skip_if_last_win_sys1)
+        self.use_trend_filter = int(use_trend_filter)
+        self.trend_ma_fast = int(trend_ma_fast)
+        self.trend_ma_slow = int(trend_ma_slow)
+        self.use_volume_filter = int(use_volume_filter)
+        self.volume_ma_period = int(volume_ma_period)
+        self.volume_mult = float(volume_mult)
+        self.use_trailing_profit = int(use_trailing_profit)
+        self.trailing_profit_pct = int(trailing_profit_pct)
 
         self.required_indicators = [ATR(period=atr_period)]
         if use_trend_filter:

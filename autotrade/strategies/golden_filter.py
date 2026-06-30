@@ -79,14 +79,14 @@ class GoldenFilterStrategy(Strategy):
         take_profit_levels: list[list[float]] | None = None,
         drawdown_rules: list | None = None,
     ):
-        self.fast = fast
-        self.slow = slow
-        self.rsi_period = rsi_period
-        self.rsi_max_entry = rsi_max_entry
-        self.bb_period = bb_period
-        self.bb_std = bb_std
-        self.vol_period = vol_period
-        self.stop_loss = stop_loss
+        self.fast = int(fast)
+        self.slow = int(slow)
+        self.rsi_period = int(rsi_period)
+        self.rsi_max_entry = float(rsi_max_entry)
+        self.bb_period = int(bb_period)
+        self.bb_std = float(bb_std)
+        self.vol_period = int(vol_period)
+        self.stop_loss = float(stop_loss)
         self.name = "golden_filter"
 
         self.required_indicators = [
@@ -97,7 +97,7 @@ class GoldenFilterStrategy(Strategy):
         ]
 
         # 分批买入
-        self.batch_entry = batch_entry
+        self.batch_entry = int(batch_entry)
         self.batches = batches or [1.0]
         self.batch_triggers = batch_triggers or [0.0]
 

@@ -42,13 +42,13 @@ class HotMoneyStrategy(Strategy):
     ):
         self.allowed_entry_dates = set(allowed_entry_dates or [])
         self.use_screener = use_screener and bool(self.allowed_entry_dates)
-        self.trailing_activate = trailing_activate
-        self.trailing_drawdown = trailing_drawdown
-        self.time_stop_days = time_stop_days
-        self.time_stop_min_gain = time_stop_min_gain
-        self.stop_loss = stop_loss
-        self.trend_ma_fast = trend_ma_fast
-        self.trend_ma_mid = trend_ma_mid
+        self.trailing_activate = int(trailing_activate)
+        self.trailing_drawdown = float(trailing_drawdown)
+        self.time_stop_days = int(time_stop_days)
+        self.time_stop_min_gain = int(time_stop_min_gain)
+        self.stop_loss = float(stop_loss)
+        self.trend_ma_fast = int(trend_ma_fast)
+        self.trend_ma_mid = int(trend_ma_mid)
         self.name = "hot_money"
         self.required_indicators = []
 

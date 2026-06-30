@@ -60,12 +60,12 @@ class TrendMABreakoutStrategy(Strategy):
         take_profit_levels: list[list[float]] | None = None,
         drawdown_rules: list | None = None,
     ):
-        self.fast = fast
-        self.slow = slow
-        self.rsi_period = rsi_period
-        self.rsi_low = rsi_low
-        self.rsi_high = rsi_high
-        self.stop_loss = stop_loss
+        self.fast = int(fast)
+        self.slow = int(slow)
+        self.rsi_period = int(rsi_period)
+        self.rsi_low = int(rsi_low)
+        self.rsi_high = int(rsi_high)
+        self.stop_loss = float(stop_loss)
         self.name = "trend_ma_breakout"
 
         self.required_indicators = [
@@ -75,7 +75,7 @@ class TrendMABreakoutStrategy(Strategy):
         ]
 
         # 分批买入
-        self.batch_entry = batch_entry
+        self.batch_entry = int(batch_entry)
         self.batches = batches or [1.0]
         self.batch_triggers = batch_triggers or [0.0]
 

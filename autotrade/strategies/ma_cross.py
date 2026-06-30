@@ -47,15 +47,15 @@ class MACrossStrategy(Strategy):
                  batch_triggers: list[float] | None = None,
                  take_profit_levels: list[list[float]] | None = None,
                  drawdown_rules: list | None = None):
-        self.fast = fast
-        self.slow = slow
-        self.stop_loss = stop_loss
-        self.take_profit = take_profit
+        self.fast = int(fast)
+        self.slow = int(slow)
+        self.stop_loss = float(stop_loss)
+        self.take_profit = float(take_profit)
         self.name = "ma_cross"
         self.required_indicators = [MA(period=fast), MA(period=slow)]
 
         # 分批买入参数
-        self.batch_entry = batch_entry
+        self.batch_entry = int(batch_entry)
         self.batches = batches or [1.0]
         self.batch_triggers = batch_triggers or [0.0]
 

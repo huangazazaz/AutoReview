@@ -57,13 +57,13 @@ class MACrossMACDStrategy(Strategy):
         take_profit_levels: list[list[float]] | None = None,
         drawdown_rules: list | None = None,
     ):
-        self.fast = fast
-        self.slow = slow
-        self.macd_fast = macd_fast
-        self.macd_slow = macd_slow
-        self.macd_signal = macd_signal
-        self.stop_loss = stop_loss
-        self.take_profit = take_profit
+        self.fast = int(fast)
+        self.slow = int(slow)
+        self.macd_fast = int(macd_fast)
+        self.macd_slow = int(macd_slow)
+        self.macd_signal = int(macd_signal)
+        self.stop_loss = float(stop_loss)
+        self.take_profit = float(take_profit)
         self.name = "ma_cross_macd"
         self.required_indicators = [
             MA(period=fast),
@@ -72,7 +72,7 @@ class MACrossMACDStrategy(Strategy):
         ]
 
         # 分批买入
-        self.batch_entry = batch_entry
+        self.batch_entry = int(batch_entry)
         self.batches = batches or [1.0]
         self.batch_triggers = batch_triggers or [0.0]
 

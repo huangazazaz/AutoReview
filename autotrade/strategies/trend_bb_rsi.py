@@ -72,19 +72,19 @@ class TrendBBRSIStrategy(Strategy):
         trailing_stop: float = 0.10,
         take_profit_levels: list[list[float]] | None = None,
     ):
-        self.bb_period = bb_period
-        self.bb_std = bb_std
-        self.rsi_period = rsi_period
-        self.rsi_buy_low = rsi_buy_low
-        self.rsi_buy_high = rsi_buy_high
-        self.rsi_sell = rsi_sell
-        self.macd_fast = macd_fast
-        self.macd_slow = macd_slow
-        self.macd_signal = macd_signal
-        self.vol_period = vol_period
-        self.vol_factor = vol_factor
-        self.stop_loss = stop_loss
-        self.trailing_stop = trailing_stop
+        self.bb_period = int(bb_period)
+        self.bb_std = float(bb_std)
+        self.rsi_period = int(rsi_period)
+        self.rsi_buy_low = int(rsi_buy_low)
+        self.rsi_buy_high = int(rsi_buy_high)
+        self.rsi_sell = int(rsi_sell)
+        self.macd_fast = int(macd_fast)
+        self.macd_slow = int(macd_slow)
+        self.macd_signal = int(macd_signal)
+        self.vol_period = int(vol_period)
+        self.vol_factor = int(vol_factor)
+        self.stop_loss = float(stop_loss)
+        self.trailing_stop = int(trailing_stop)
 
         self.name = "trend_bb_rsi"
         self.required_indicators = [

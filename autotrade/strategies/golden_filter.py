@@ -58,6 +58,21 @@ from autotrade.indicators.ma import MA
 from autotrade.indicators.rsi import RSI
 
 
+
+
+def _parse_list(val):
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        import json
+        try:
+            p = json.loads(val)
+            if isinstance(p, list):
+                return p
+        except:
+            pass
+    return val or []
+
 class GoldenFilterStrategy(Strategy):
     name = "golden_filter"
 
@@ -103,7 +118,7 @@ class GoldenFilterStrategy(Strategy):
 
         # 阶梯止盈
         if take_profit_levels:
-            self.take_profit_levels = [(float(tp[0]), float(tp[1])) for tp in take_profit_levels]
+            self.take_profit_levels = [(float(tp[0]), float(tp[1])) for tp in (_parse_list(take_profit_levels))]
         elif take_profit > 0:
             self.take_profit_levels = [(take_profit, 1.0)]
         else:
@@ -111,7 +126,7 @@ class GoldenFilterStrategy(Strategy):
 
         # 回撤规则
         if drawdown_rules:
-            self.drawdown_rules = [(float(r[0]), float(r[1])) for r in drawdown_rules]
+            self.drawdown_rules = [(float(r[0]), float(r[1])) for r in (_parse_list(drawdown_rules))]
         else:
             self.drawdown_rules = [(trend_end, -1.0)]
 

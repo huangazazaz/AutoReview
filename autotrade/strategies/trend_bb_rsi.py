@@ -52,6 +52,21 @@ from autotrade.indicators.macd import MACD
 from autotrade.indicators.rsi import RSI
 
 
+
+
+def _parse_list(val):
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        import json
+        try:
+            p = json.loads(val)
+            if isinstance(p, list):
+                return p
+        except:
+            pass
+    return val or []
+
 class TrendBBRSIStrategy(Strategy):
     name = "trend_bb_rsi"
 
@@ -95,7 +110,7 @@ class TrendBBRSIStrategy(Strategy):
 
         # 阶梯止盈
         if take_profit_levels:
-            self.take_profit_levels = [(float(tp[0]), float(tp[1])) for tp in take_profit_levels]
+            self.take_profit_levels = [(float(tp[0]), float(tp[1])) for tp in (_parse_list(take_profit_levels))]
         else:
             self.take_profit_levels = [(0.15, 0.4), (0.30, 0.4)]
 

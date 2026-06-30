@@ -35,6 +35,21 @@ from autotrade.core.models import Signal
 from autotrade.indicators.ma import MA
 
 
+
+
+def _parse_list(val):
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        import json
+        try:
+            p = json.loads(val)
+            if isinstance(p, list):
+                return p
+        except:
+            pass
+    return val or []
+
 class MACrossStrategy(Strategy):
     name = "ma_cross"
 
@@ -61,7 +76,7 @@ class MACrossStrategy(Strategy):
 
         # 阶梯止盈参数（严格按配置比例，不强制清仓）
         if take_profit_levels:
-            self.take_profit_levels = [(tp[0], tp[1]) for tp in take_profit_levels]
+            self.take_profit_levels = [(float(tp[0]), float(tp[1])) for tp in (_parse_list(take_profit_levels))]
         elif take_profit > 0:
             self.take_profit_levels = [(take_profit, 1.0)]
         else:
@@ -69,7 +84,7 @@ class MACrossStrategy(Strategy):
 
         # 回撤规则: [(回撤%, 力度), ...]  正数=加仓 负数=减仓 -1=清仓
         if drawdown_rules:
-            self.drawdown_rules = [(float(r[0]), float(r[1])) for r in drawdown_rules]
+            self.drawdown_rules = [(float(r[0]), float(r[1])) for r in (_parse_list(drawdown_rules))]
         else:
             self.drawdown_rules = [(trend_end, -1.0)]  # 旧 trend_end → 单级清仓
 

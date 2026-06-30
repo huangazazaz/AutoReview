@@ -84,7 +84,7 @@ class TrendBBRSIStrategy(Strategy):
         self.vol_period = int(vol_period)
         self.vol_factor = int(vol_factor)
         self.stop_loss = float(stop_loss)
-        self.trailing_stop = int(trailing_stop)
+        self.trailing_stop = float(trailing_stop)
 
         self.name = "trend_bb_rsi"
         self.required_indicators = [

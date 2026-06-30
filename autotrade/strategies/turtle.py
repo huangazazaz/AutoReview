@@ -82,7 +82,7 @@ class TurtleTraderStrategy(Strategy):
         self.volume_ma_period = int(volume_ma_period)
         self.volume_mult = float(volume_mult)
         self.use_trailing_profit = str(use_trailing_profit).lower() in ("true", "1", "yes") if not isinstance(use_trailing_profit, bool) else use_trailing_profit
-        self.trailing_profit_pct = int(trailing_profit_pct)
+        self.trailing_profit_pct = float(trailing_profit_pct)
 
         self.required_indicators = [ATR(period=atr_period)]
         if use_trend_filter:

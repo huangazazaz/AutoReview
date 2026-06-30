@@ -6,6 +6,7 @@ import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, escapeHtml } from '@/utils/format'
+import Select from 'react-select'
 import type { StrategyInfo, BacktestSummary, BacktestResultItem, CachedStock, GroupInfo } from '@/types'
 
 /* ------------------------------------------------------------------ */
@@ -525,22 +526,24 @@ const Backtest = () => {
                         alignItems: 'center',
                       }}
                     >
-                      <select
+                      <Select
                         id="cached-stocks-select"
-                        className="form-select"
-                        value={selectedCachedStock}
-                        onChange={(e) =>
-                          setSelectedCachedStock(e.target.value)
-                        }
-                      >
-                        <option value="">选择缓存的股票…</option>
-                        {cachedStocks.map((stock) => (
-                          <option key={stock.symbol} value={stock.symbol}>
-                            {stock.symbol}
-                            {stock.name ? ` - ${stock.name}` : ''}
-                          </option>
-                        ))}
-                      </select>
+                        placeholder="搜索并选择股票…"
+                        options={cachedStocks.map(s => ({
+                          value: s.symbol,
+                          label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
+                        }))}
+                        value={selectedCachedStock ? {
+                          value: selectedCachedStock,
+                          label: cachedStocks.find(s => s.symbol === selectedCachedStock)?.symbol || selectedCachedStock
+                        } : null}
+                        onChange={(o) => setSelectedCachedStock(o?.value || '')}
+                        isSearchable
+                        isClearable
+                        className="react-select"
+                        classNamePrefix="rs"
+                        styles={{ container: (b) => ({ ...b, flex: 1 }) }}
+                      />
 
                       <button
                         type="button"
@@ -575,19 +578,16 @@ const Backtest = () => {
                   <label className="form-label" htmlFor="group-select">
                     选择分组
                   </label>
-                  <select
+                  <Select
                     id="group-select"
-                    className="form-select"
-                    value={selectedGroup}
-                    onChange={(e) => setSelectedGroup(e.target.value)}
-                  >
-                    <option value="">选择分组…</option>
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name || g.id}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="选择分组…"
+                    options={groups.map(g => ({ value: g.id, label: g.name || g.id }))}
+                    value={selectedGroup ? { value: selectedGroup, label: groups.find(g => g.id === selectedGroup)?.name || selectedGroup } : null}
+                    onChange={(o) => setSelectedGroup(o?.value || '')}
+                    isClearable
+                    className="react-select"
+                    classNamePrefix="rs"
+                  />
                 </div>
               </div>
             )}
@@ -601,57 +601,46 @@ const Backtest = () => {
                 <label className="form-label" htmlFor="strategy-select">
                   选择策略
                 </label>
-                <select
+                <Select
                   id="strategy-select"
-                  className="form-select"
-                  value={selectedStrategy}
-                  onChange={(e) => setSelectedStrategy(e.target.value)}
-                >
-                  <option value="">选择策略…</option>
-                  {strategies.map((s) => (
-                    <option key={s.name} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="选择策略…"
+                  options={strategies.map(s => ({ value: s.name, label: s.name }))}
+                  value={selectedStrategy ? { value: selectedStrategy, label: selectedStrategy } : null}
+                  onChange={(o) => setSelectedStrategy(o?.value || '')}
+                  isClearable
+                  className="react-select"
+                  classNamePrefix="rs"
+                />
               </div>
 
               <div className="form-group">
                 <label className="form-label" htmlFor="period-select">
                   回测周期
                 </label>
-                <select
+                <Select
                   id="period-select"
-                  className="form-select"
-                  value={selectedPeriod}
-                  onChange={(e) => setSelectedPeriod(e.target.value)}
-                >
-                  <option value="">默认</option>
-                  {PERIODS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="默认"
+                  options={PERIODS}
+                  value={PERIODS.find(p => p.value === selectedPeriod) || null}
+                  onChange={(o) => setSelectedPeriod(o?.value || '')}
+                  className="react-select"
+                  classNamePrefix="rs"
+                />
               </div>
 
               <div className="form-group">
                 <label className="form-label" htmlFor="datasource-select">
                   数据源
                 </label>
-                <select
+                <Select
                   id="datasource-select"
-                  className="form-select"
-                  value={selectedDatasource}
-                  onChange={(e) => setSelectedDatasource(e.target.value)}
-                >
-                  <option value="">默认</option>
-                  {datasources.map((ds) => (
-                    <option key={ds} value={ds}>
-                      {ds}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="默认"
+                  options={datasources.map(ds => ({ value: ds, label: ds }))}
+                  value={selectedDatasource ? { value: selectedDatasource, label: selectedDatasource } : null}
+                  onChange={(o) => setSelectedDatasource(o?.value || '')}
+                  className="react-select"
+                  classNamePrefix="rs"
+                />
               </div>
             </div>
 

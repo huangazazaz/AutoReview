@@ -84,6 +84,7 @@ export interface StrategyInfo {
   name: string
   params: Record<string, unknown>
   param_schema?: Record<string, ParamSchemaEntry>
+  is_builtin?: boolean
 }
 
 export interface StrategiesResponse {

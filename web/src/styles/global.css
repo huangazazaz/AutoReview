@@ -1667,3 +1667,80 @@ code {
         border-top-color: var(--border);
     }
 }
+
+/* ============================================================
+   React-Select 深色主题
+   ============================================================ */
+.react-select .rs__control {
+  background: var(--bg-card);
+  border-color: var(--border);
+  border-radius: 6px;
+  min-height: 36px;
+  box-shadow: none;
+  transition: border-color 0.2s;
+}
+.react-select .rs__control:hover {
+  border-color: var(--accent);
+}
+.react-select .rs__control--is-focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.25);
+}
+.react-select .rs__single-value {
+  color: var(--text-primary);
+}
+.react-select .rs__placeholder {
+  color: var(--text-muted);
+}
+.react-select .rs__input {
+  color: var(--text-primary);
+}
+.react-select .rs__indicator-separator {
+  background: var(--border);
+}
+.react-select .rs__indicator {
+  color: var(--text-muted);
+}
+.react-select .rs__indicator:hover {
+  color: var(--text-primary);
+}
+.react-select .rs__menu {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 9999;
+}
+.react-select .rs__option {
+  color: var(--text-primary);
+  background: transparent;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.react-select .rs__option:hover,
+.react-select .rs__option--is-focused {
+  background: var(--bg-card-hover);
+}
+.react-select .rs__option--is-selected {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent);
+}
+.react-select .rs__option--is-disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+.react-select .rs__multi-value {
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 4px;
+}
+.react-select .rs__multi-value__label {
+  color: var(--accent);
+  padding: 2px 6px;
+}
+.react-select .rs__multi-value__remove {
+  color: var(--accent);
+  cursor: pointer;
+}
+.react-select .rs__multi-value__remove:hover {
+  background: rgba(245, 158, 11, 0.3);
+  color: #fff;
+}

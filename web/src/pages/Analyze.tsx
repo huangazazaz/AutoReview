@@ -5,6 +5,7 @@ import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState, TrendIndicator } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
+import Select from 'react-select'
 import type { AnalyzeResult, StrategyInfo, Bar, Trade, CachedStock } from '@/types'
 import * as echarts from 'echarts'
 
@@ -484,37 +485,30 @@ export default function Analyze() {
               <label className="form-label" htmlFor="analyze-strategy">
                 策略
               </label>
-              <select
+              <Select
                 id="analyze-strategy"
-                className="form-select"
-                value={strategyName}
-                onChange={(e) => handleStrategyChange(e.target.value)}
-              >
-                <option value="">— 请选择策略 —</option>
-                {strategies.map((s) => (
-                  <option key={s.name} value={s.name}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="请选择策略"
+                options={strategies.map(s => ({ value: s.name, label: s.name }))}
+                value={strategyName ? { value: strategyName, label: strategyName } : null}
+                onChange={(o) => handleStrategyChange(o?.value || '')}
+                isClearable
+                className="react-select"
+                classNamePrefix="rs"
+              />
             </div>
 
             <div className="form-group" style={{ flex: 1 }}>
               <label className="form-label" htmlFor="analyze-period">
                 周期
               </label>
-              <select
+              <Select
                 id="analyze-period"
-                className="form-select"
-                value={period}
-                onChange={(e) => handlePeriodChange(e.target.value)}
-              >
-                {PERIOD_OPTIONS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
+                options={PERIOD_OPTIONS}
+                value={PERIOD_OPTIONS.find(p => p.value === period) || null}
+                onChange={(o) => handlePeriodChange(o?.value || '1y')}
+                className="react-select"
+                classNamePrefix="rs"
+              />
             </div>
           </div>
 
@@ -524,21 +518,19 @@ export default function Analyze() {
               <label className="form-label" htmlFor="analyze-datasource">
                 数据源
               </label>
-              <select
+              <Select
                 id="analyze-datasource"
-                className="form-select"
-                value={datasource}
-                onChange={(e) => setDatasource(e.target.value)}
-              >
-                <option value="auto">自动（主备降级）</option>
-                {datasources
-                  .filter((d) => d !== 'auto')
-                  .map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-              </select>
+                placeholder="自动（主备降级）"
+                options={[
+                  { value: 'auto', label: '自动（主备降级）' },
+                  ...datasources.filter(d => d !== 'auto').map(d => ({ value: d, label: d }))
+                ]}
+                value={datasource ? { value: datasource, label: datasource === 'auto' ? '自动（主备降级）' : datasource } : null}
+                onChange={(o) => setDatasource(o?.value || '')}
+                isClearable
+                className="react-select"
+                classNamePrefix="rs"
+              />
             </div>
 
             <div className="form-group" style={{ flex: 1 }}>

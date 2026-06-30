@@ -24,6 +24,20 @@ from autotrade.core.models import Signal
 from autotrade.indicators.macd import MACD
 
 
+
+
+def _parse_list(val):
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        import json
+        try:
+            p = json.loads(val)
+            if isinstance(p, list):
+                return p
+        except:
+            pass
+    return val or []
 class MACDDivergenceStrategy(Strategy):
     name = "macd_divergence"
 

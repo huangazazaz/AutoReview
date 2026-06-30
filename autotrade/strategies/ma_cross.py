@@ -49,7 +49,6 @@ def _parse_list(val):
         except:
             pass
     return val or []
-
 class MACrossStrategy(Strategy):
     name = "ma_cross"
 
@@ -71,8 +70,8 @@ class MACrossStrategy(Strategy):
 
         # 分批买入参数
         self.batch_entry = str(batch_entry).lower() in ("true", "1", "yes") if not isinstance(batch_entry, bool) else batch_entry
-        self.batches = batches or [1.0]
-        self.batch_triggers = batch_triggers or [0.0]
+        self.batches = _parse_list(batches) or [1.0]
+        self.batch_triggers = _parse_list(batch_triggers) or [0.0]
 
         # 阶梯止盈参数（严格按配置比例，不强制清仓）
         if take_profit_levels:

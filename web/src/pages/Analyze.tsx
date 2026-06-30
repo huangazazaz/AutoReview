@@ -342,7 +342,11 @@ export default function Analyze() {
         // Reset overrides to strategy defaults
         const defaults: Record<string, string> = {}
         for (const [key, val] of Object.entries(strat.params)) {
-          defaults[key] = String(val ?? '')
+          if (Array.isArray(val) || (typeof val === 'object' && val !== null)) {
+            defaults[key] = JSON.stringify(val)
+          } else {
+            defaults[key] = String(val ?? '')
+          }
         }
         setStrategyParams(defaults)
       } else {

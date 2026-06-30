@@ -19,6 +19,20 @@ from autotrade.core.interfaces import Strategy
 from autotrade.core.models import Signal
 
 
+
+
+def _parse_list(val):
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        import json
+        try:
+            p = json.loads(val)
+            if isinstance(p, list):
+                return p
+        except:
+            pass
+    return val or []
 def _sma(series: pd.Series, period: int) -> pd.Series:
     return series.rolling(window=period, min_periods=period).mean()
 

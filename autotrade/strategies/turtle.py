@@ -21,6 +21,20 @@ from autotrade.indicators.atr import ATR
 from autotrade.indicators.ma import MA
 
 
+
+
+def _parse_list(val):
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        import json
+        try:
+            p = json.loads(val)
+            if isinstance(p, list):
+                return p
+        except:
+            pass
+    return val or []
 class TurtleTraderStrategy(Strategy):
     """Classic Turtle Trading System with dual-system bidirectional signals."""
 

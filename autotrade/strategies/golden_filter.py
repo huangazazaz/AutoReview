@@ -72,7 +72,6 @@ def _parse_list(val):
         except:
             pass
     return val or []
-
 class GoldenFilterStrategy(Strategy):
     name = "golden_filter"
 
@@ -113,8 +112,8 @@ class GoldenFilterStrategy(Strategy):
 
         # 分批买入
         self.batch_entry = str(batch_entry).lower() in ("true", "1", "yes") if not isinstance(batch_entry, bool) else batch_entry
-        self.batches = batches or [1.0]
-        self.batch_triggers = batch_triggers or [0.0]
+        self.batches = _parse_list(batches) or [1.0]
+        self.batch_triggers = _parse_list(batch_triggers) or [0.0]
 
         # 阶梯止盈
         if take_profit_levels:

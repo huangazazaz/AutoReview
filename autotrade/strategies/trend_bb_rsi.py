@@ -66,7 +66,6 @@ def _parse_list(val):
         except:
             pass
     return val or []
-
 class TrendBBRSIStrategy(Strategy):
     name = "trend_bb_rsi"
 

@@ -6,7 +6,6 @@ Output column:
 from __future__ import annotations
 
 import pandas as pd
-import pandas_ta as ta
 
 from autotrade.core.interfaces import Indicator
 
@@ -24,5 +23,13 @@ class ATR(Indicator):
         col = f"ind_atr_{self.period}"
         if col in df.columns:
             return df
-        df[col] = ta.atr(df["high"], df["low"], df["close"], length=self.period)
+
+        high, low, close = df["high"], df["low"], df["close"]
+        prev_close = close.shift(1)
+        tr = pd.concat([
+            (high - low).abs(),
+            (high - prev_close).abs(),
+            (low - prev_close).abs(),
+        ], axis=1).max(axis=1)
+        df[col] = tr.ewm(alpha=1 / self.period, adjust=False).mean()
         return df

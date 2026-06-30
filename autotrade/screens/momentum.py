@@ -23,9 +23,25 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
-import pandas_ta as ta
 
 from autotrade.core.interfaces import Screener
+
+
+def _sma(series: pd.Series, length: int) -> pd.Series:
+    """Simple Moving Average."""
+    return series.rolling(window=length).mean()
+
+
+def _atr(df: pd.DataFrame, length: int) -> pd.Series:
+    """Average True Range using Wilder's smoothing."""
+    high, low, close = df["high"], df["low"], df["close"]
+    prev_close = close.shift(1)
+    tr = pd.concat([
+        (high - low).abs(),
+        (high - prev_close).abs(),
+        (low - prev_close).abs(),
+    ], axis=1).max(axis=1)
+    return tr.ewm(alpha=1 / length, adjust=False).mean()
 
 
 class MomentumScreener(Screener):
@@ -123,8 +139,8 @@ class MomentumScreener(Screener):
             return False
 
         # 趋势: MA20 > MA60
-        ma20 = ta.sma(close, length=20)
-        ma60 = ta.sma(close, length=60)
+        ma20 = _sma(close, length=20)
+        ma60 = _sma(close, length=60)
         ma20_val = float(ma20.iloc[idx])
         ma60_val = float(ma60.iloc[idx])
         if pd.isna(ma20_val) or pd.isna(ma60_val):
@@ -235,10 +251,10 @@ class MomentumScreener(Screener):
     def _calc_ma_score(self, df: pd.DataFrame, idx: int) -> float:
         """均线多头排列程度：MA5>MA10>MA20>MA60 满足几条。"""
         close = df["close"]
-        ma5 = ta.sma(close, length=5)
-        ma10 = ta.sma(close, length=10)
-        ma20 = ta.sma(close, length=20)
-        ma60 = ta.sma(close, length=60)
+        ma5 = _sma(close, length=5)
+        ma10 = _sma(close, length=10)
+        ma20 = _sma(close, length=20)
+        ma60 = _sma(close, length=60)
 
         m5 = float(ma5.iloc[idx])
         m10 = float(ma10.iloc[idx])
@@ -259,7 +275,7 @@ class MomentumScreener(Screener):
     def _calc_pullback(self, df: pd.DataFrame, idx: int) -> float | None:
         """收盘价距MA20的偏离度 (close - ma20) / ma20。"""
         close = df["close"]
-        ma20 = ta.sma(close, length=20)
+        ma20 = _sma(close, length=20)
         c = float(close.iloc[idx])
         m20 = float(ma20.iloc[idx])
         if pd.isna(c) or pd.isna(m20) or m20 <= 0:
@@ -273,7 +289,7 @@ class MomentumScreener(Screener):
         c = float(df["close"].iloc[idx])
         if pd.isna(c) or c <= 0:
             return None
-        atr_series = ta.atr(df["high"], df["low"], df["close"], length=20)
+        atr_series = _atr(df, length=20)
         atr_val = float(atr_series.iloc[idx])
         if pd.isna(atr_val):
             return None

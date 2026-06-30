@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 import pandas as pd
-import pandas_ta as ta
 
 from autotrade.core.interfaces import Indicator
 
@@ -29,9 +28,9 @@ class MA(Indicator):
             return df
 
         if self.mode == "ema":
-            df[col] = ta.ema(df["close"], length=self.period)
+            df[col] = df["close"].ewm(span=self.period, adjust=False).mean()
         else:
-            df[col] = ta.sma(df["close"], length=self.period)
+            df[col] = df["close"].rolling(window=self.period).mean()
         return df
 
 
@@ -48,5 +47,5 @@ class EMA(Indicator):
         col = f"ind_ema_{self.period}"
         if col in df.columns:
             return df
-        df[col] = ta.ema(df["close"], length=self.period)
+        df[col] = df["close"].ewm(span=self.period, adjust=False).mean()
         return df

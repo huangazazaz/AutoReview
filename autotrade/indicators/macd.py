@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import pandas as pd
-import pandas_ta as ta
 
 from autotrade.core.interfaces import Indicator
 
@@ -28,9 +27,15 @@ class MACD(Indicator):
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         if "ind_macd_macd" in df.columns:
             return df
-        result = ta.macd(df["close"], fast=self.fast, slow=self.slow, signal=self.signal)
-        if result is not None:
-            df["ind_macd_macd"] = result.iloc[:, 0]
-            df["ind_macd_signal"] = result.iloc[:, 1]
-            df["ind_macd_histogram"] = result.iloc[:, 2]
+
+        close = df["close"]
+        ema_fast = close.ewm(span=self.fast, adjust=False).mean()
+        ema_slow = close.ewm(span=self.slow, adjust=False).mean()
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=self.signal, adjust=False).mean()
+        histogram = macd_line - signal_line
+
+        df["ind_macd_macd"] = macd_line
+        df["ind_macd_signal"] = signal_line
+        df["ind_macd_histogram"] = histogram
         return df

@@ -12,6 +12,9 @@ import type {
   AIStrategyGenerateResponse,
   SaveStrategyResponse,
   DeleteStrategyResponse,
+  ChatRequest,
+  ChatResponse,
+  ChatHistoryResponse,
 } from '@/types'
 
 const BASE = ''
@@ -140,4 +143,12 @@ export const api = {
   }) => post<SaveStrategyResponse>('/strategies/save', params),
 
   deleteStrategy: (name: string) => del<DeleteStrategyResponse>(`/strategies/${name}`),
+
+  chat: (params: ChatRequest) => post<ChatResponse>('/ai/chat', params),
+
+  getChatHistory: (sessionId: string) =>
+    get<ChatHistoryResponse>('/ai/chat/' + encodeURIComponent(sessionId)),
+
+  deleteChat: (sessionId: string) =>
+    del<{ ok: boolean }>('/ai/chat/' + encodeURIComponent(sessionId)),
 }

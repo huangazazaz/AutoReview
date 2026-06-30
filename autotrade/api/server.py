@@ -25,12 +25,12 @@ from __future__ import annotations
 import logging
 import os
 import importlib.util
-from datetime import date
+from datetime import datetime, date, timezone
 from typing import Optional
 
 from pathlib import Path
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -39,6 +39,10 @@ from autotrade.core.engine import analyze_stock, run_backtest, run_portfolio_bac
 from autotrade.registry import (
     init_registry, list_datasources, list_strategies,
 )
+from autotrade.ai.session_store import SessionStore, ChatMessage as StoreChatMessage
+
+# Session store singleton
+_session_store = SessionStore(ttl_seconds=7200)
 
 # ---- FastAPI 应用 ----
 app = FastAPI(
@@ -108,6 +112,34 @@ class SaveStrategyRequest(BaseModel):
     name: str
     python_code: str
     yaml_code: str
+
+
+class ChatRequest(BaseModel):
+    session_id: Optional[str] = None
+    prompt: str
+    symbol: str = "600522"
+    start: Optional[str] = None
+    end: Optional[str] = None
+
+
+class ChatMessageResponse(BaseModel):
+    role: str
+    content: str
+    timestamp: str
+    strategy: Optional[dict] = None
+    backtest: Optional[dict] = None
+
+
+class ChatResponse(BaseModel):
+    session_id: str
+    message: ChatMessageResponse
+    strategy: Optional[dict] = None
+    backtest: Optional[dict] = None
+
+
+class ChatHistoryResponse(BaseModel):
+    session: dict
+    messages: list[ChatMessageResponse]
 
 
 # ---- 启动事件 ----
@@ -325,6 +357,210 @@ def api_generate_strategy(req: GenerateStrategyRequest):
         "reasoning": generated.get("reasoning", ""),
         "backtest": backtest_result,
     }
+
+
+@app.post("/ai/chat")
+def api_chat(req: ChatRequest):
+    """多轮对话式 AI 策略生成与修改。"""
+    from autotrade.ai.strategy_generator import StrategyGenerator
+
+    api_key = _get_deepseek_api_key()
+    if not api_key:
+        return {"error": "未配置 DEEPSEEK_API_KEY 环境变量"}
+
+    # Get or create session
+    session = None
+    if req.session_id:
+        session = _session_store.get_session(req.session_id)
+    if session is None:
+        title = req.prompt[:50] if len(req.prompt) > 50 else req.prompt
+        session = _session_store.create_session(title=title)
+        if req.session_id:
+            logger.info("Session %s not found, created new: %s", req.session_id, session.session_id)
+
+    session_id = session.session_id
+
+    # Save user message
+    user_msg = StoreChatMessage(
+        role="user",
+        content=req.prompt,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+    _session_store.add_message(session_id, user_msg)
+
+    # Build conversation history for AI
+    history = []
+    for m in session.messages[:-1]:  # Exclude the just-added user message
+        msg_dict = {"role": m.role, "content": m.content}
+        if m.strategy:
+            msg_dict["strategy"] = m.strategy
+        if m.backtest:
+            msg_dict["backtest"] = m.backtest
+        history.append(msg_dict)
+
+    # Generate AI response
+    gen = StrategyGenerator(api_key=api_key)
+    result = gen.chat(history, req.prompt)
+
+    if "error" in result:
+        # Save error as assistant message too
+        error_msg = StoreChatMessage(
+            role="assistant",
+            content=result.get("error", "未知错误"),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+        _session_store.add_message(session_id, error_msg)
+        return ChatResponse(
+            session_id=session_id,
+            message=ChatMessageResponse(
+                role="assistant",
+                content=result["error"],
+                timestamp=error_msg.timestamp,
+            ),
+        ).model_dump()
+
+    # Run backtest if strategy was generated/modified
+    backtest_result = None
+    if result.get("strategy") and result["action"] in ("generate", "modify"):
+        strategy_data = result["strategy"]
+        s, e = _resolve_dates(req.start, req.end, "1y")
+        try:
+            strategy_code = strategy_data["python_code"]
+            spec = importlib.util.spec_from_loader(
+                strategy_data["name"], loader=None, origin="<ai_chat>")
+            if spec is None:
+                raise RuntimeError("Failed to create module spec")
+
+            module = importlib.util.module_from_spec(spec)
+            exec(strategy_code, module.__dict__)
+
+            strat_class = None
+            for attr_name in dir(module):
+                obj = getattr(module, attr_name)
+                if (isinstance(obj, type)
+                        and hasattr(obj, "generate_signals")
+                        and hasattr(obj, "name")
+                        and attr_name != "Strategy"):
+                    strat_class = obj
+                    break
+
+            if strat_class is None:
+                raise RuntimeError("未在生成的代码中找到策略类")
+
+            from autotrade.core.engine import _bars_to_dataframe, _make_backtest_config
+            from autotrade.core.backtester import Backtester
+            from autotrade.core.datasource_factory import build_datasource_from_name
+
+            import yaml
+            strategy = None
+            try:
+                parsed_yaml = yaml.safe_load(strategy_data["yaml_code"])
+                yaml_params = parsed_yaml.get("params", {}) if isinstance(parsed_yaml, dict) else {}
+                strategy = strat_class(**yaml_params)
+            except (TypeError, Exception):
+                try:
+                    strategy = strat_class()
+                except Exception:
+                    import inspect
+                    sig_params = inspect.signature(strat_class.__init__).parameters
+                    accepted = {k: v for k, v in yaml_params.items() if k in sig_params}
+                    strategy = strat_class(**accepted) if accepted else strat_class()
+
+            ds = build_datasource_from_name("failover")
+            bars = ds.get_bars(req.symbol, s, e)
+            if bars:
+                df = _bars_to_dataframe(bars)
+                for ind in strategy.required_indicators:
+                    df = ind.compute(df)
+
+                raw_signals = strategy.generate_signals(df)
+                for sig in raw_signals:
+                    if not sig.symbol:
+                        sig.symbol = req.symbol
+
+                config = _make_backtest_config()
+                backtester_obj = Backtester(config)
+                bt_result = backtester_obj.run(raw_signals, bars)
+
+                backtest_result = {
+                    "symbol": req.symbol,
+                    "return_pct": round(bt_result.metrics.get("total_return_pct", 0), 2),
+                    "win_rate": round(bt_result.metrics.get("win_rate", 0), 2),
+                    "sharpe_ratio": round(bt_result.metrics.get("sharpe_ratio", 0), 4),
+                    "max_drawdown_pct": round(bt_result.metrics.get("max_drawdown_pct", 0), 2),
+                    "total_trades": len(bt_result.trades),
+                }
+
+            # Update session's current strategy
+            _session_store.update_strategy(
+                session_id,
+                strategy_data["python_code"],
+                strategy_data["yaml_code"],
+            )
+        except Exception as ex:
+            logger.warning("Failed to backtest in chat: %s", ex)
+            backtest_result = {"error": str(ex)}
+
+    # Save assistant message
+    assistant_msg = StoreChatMessage(
+        role="assistant",
+        content=result.get("message", ""),
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        strategy=result.get("strategy"),
+        backtest=backtest_result,
+    )
+    _session_store.add_message(session_id, assistant_msg)
+
+    return ChatResponse(
+        session_id=session_id,
+        message=ChatMessageResponse(
+            role="assistant",
+            content=result.get("message", ""),
+            timestamp=assistant_msg.timestamp,
+            strategy=result.get("strategy"),
+            backtest=backtest_result,
+        ),
+        strategy=result.get("strategy"),
+        backtest=backtest_result,
+    ).model_dump()
+
+
+@app.get("/ai/chat/{session_id}")
+def api_get_chat(session_id: str):
+    """获取会话完整历史。"""
+    session = _session_store.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    messages = []
+    for m in session.messages:
+        messages.append(ChatMessageResponse(
+            role=m.role,
+            content=m.content,
+            timestamp=m.timestamp,
+            strategy=m.strategy,
+            backtest=m.backtest,
+        ))
+
+    return ChatHistoryResponse(
+        session={
+            "session_id": session.session_id,
+            "title": session.title,
+            "created_at": session.created_at,
+            "last_active": session.last_active,
+            "message_count": len(session.messages),
+        },
+        messages=messages,
+    ).model_dump()
+
+
+@app.delete("/ai/chat/{session_id}")
+def api_delete_chat(session_id: str):
+    """删除会话。"""
+    deleted = _session_store.delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    return {"ok": True}
 
 
 @app.post("/strategies/save")

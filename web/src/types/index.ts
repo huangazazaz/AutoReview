@@ -193,3 +193,58 @@ export interface DeleteStrategyResponse {
   deleted?: string[]
   error?: string
 }
+
+// ---- AI 多轮对话 ----
+
+export interface ChatRequest {
+  session_id?: string
+  prompt: string
+  symbol?: string
+  start?: string
+  end?: string
+}
+
+export interface StrategyResult {
+  name: string
+  display_name: string
+  description: string
+  python_code: string
+  yaml_code: string
+  reasoning: string
+}
+
+export interface ChatResponse {
+  session_id: string
+  message: {
+    role: 'assistant'
+    content: string
+    timestamp: string
+    strategy?: StrategyResult
+    backtest?: AIStrategyBacktest
+  }
+  strategy?: StrategyResult
+  backtest?: AIStrategyBacktest
+}
+
+export interface ChatMessage {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
+  strategy?: StrategyResult
+  backtest?: AIStrategyBacktest
+  codeExpanded?: boolean
+}
+
+export interface ChatSession {
+  session_id: string
+  title: string
+  created_at: string
+  last_active: string
+  message_count: number
+}
+
+export interface ChatHistoryResponse {
+  session: ChatSession
+  messages: ChatMessage[]
+}

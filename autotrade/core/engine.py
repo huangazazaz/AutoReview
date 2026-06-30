@@ -88,6 +88,7 @@ def analyze_stock(
     result = backtester.run(raw_signals, bars)
     result.signals = raw_signals
     result.stock_name = stock_name
+    result.close_prices = df.set_index("date")["close"] if "date" in df.columns else df["close"]
 
     logger.info(
         "Analyzed %s with %s: %d trades, return %.2f%%",

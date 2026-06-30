@@ -956,19 +956,23 @@ def _format_result(result, symbol: str) -> dict:
     if result.equity_curve is not None:
         import pandas as pd
         ec = result.equity_curve
-        # 提取日期和净值：兼容 DatetimeIndex 和普通 date 对象索引
+        cl = result.close_prices  # 收盘价序列
         try:
             if isinstance(ec.index, pd.DatetimeIndex):
-                equity_points = [
-                    {"date": str(d.date()), "equity": round(float(v), 2)}
-                    for d, v in zip(ec.index, ec.values)
-                ]
+                equity_points = []
+                for i, (d, v) in enumerate(zip(ec.index, ec.values)):
+                    pt = {"date": str(d.date()), "equity": round(float(v), 2)}
+                    if cl is not None and i < len(cl):
+                        pt["close"] = round(float(cl.iloc[i]), 2)
+                    equity_points.append(pt)
             else:
-                equity_points = [
-                    {"date": str(d) if hasattr(d, 'isoformat') else str(d),
-                     "equity": round(float(v), 2)}
-                    for d, v in zip(ec.index, ec.values)
-                ]
+                equity_points = []
+                for i, (d, v) in enumerate(zip(ec.index, ec.values)):
+                    pt = {"date": str(d) if hasattr(d, 'isoformat') else str(d),
+                          "equity": round(float(v), 2)}
+                    if cl is not None and i < len(cl):
+                        pt["close"] = round(float(cl.iloc[i]), 2)
+                    equity_points.append(pt)
         except Exception:
             equity_points = None
 

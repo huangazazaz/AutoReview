@@ -1,23 +1,33 @@
-
 import { useRef, useEffect } from 'react'
-import type { ChatMessage as ChatMessageType } from '@/types'
+import type { ChatMessage as ChatMessageType, StrategyResult } from '@/types'
 import ChatBubble from './ChatBubble'
 
 interface ChatMessagesProps {
   messages: ChatMessageType[]
   onCodeExpand: (id: number) => void
+  onSave?: (strategy: StrategyResult) => void
+  onDelete?: (name: string) => void
+  onCopy?: (code: string) => void
+  sending?: boolean
 }
 
-export default function ChatMessages({ messages, onCodeExpand }: ChatMessagesProps) {
+export default function ChatMessages({
+  messages,
+  onCodeExpand,
+  onSave,
+  onDelete,
+  onCopy,
+  sending,
+}: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, sending])
 
   return (
     <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
-      {messages.length === 0 ? (
+      {messages.length === 0 && !sending ? (
         <div className="empty-state-enhanced" style={{ marginTop: 60 }}>
           <div className="empty-icon-bg">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -31,8 +41,28 @@ export default function ChatMessages({ messages, onCodeExpand }: ChatMessagesPro
         </div>
       ) : (
         messages.map(msg => (
-          <ChatBubble key={msg.id} message={msg} onCodeExpand={onCodeExpand} />
+          <ChatBubble
+            key={msg.id}
+            message={msg}
+            onCodeExpand={onCodeExpand}
+            onSave={onSave}
+            onDelete={onDelete}
+            onCopy={onCopy}
+          />
         ))
+      )}
+      {sending && (
+        <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
+          <div style={{
+            padding: '12px 18px', borderRadius: 'var(--radius-lg)',
+            background: 'linear-gradient(135deg, rgba(30,41,59,0.95) 0%, rgba(40,53,72,0.95) 100%)',
+            border: '1px solid var(--border-light)',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }}></div>
+            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>AI 正在思考...</span>
+          </div>
+        </div>
       )}
       <div ref={bottomRef} />
     </div>

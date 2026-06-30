@@ -1,12 +1,15 @@
-import type { ChatMessage } from '@/types'
+import type { ChatMessage, StrategyResult } from '@/types'
 import StrategyCard from './StrategyCard'
 
 interface ChatBubbleProps {
   message: ChatMessage
   onCodeExpand: (id: number) => void
+  onSave?: (strategy: StrategyResult) => void
+  onDelete?: (name: string) => void
+  onCopy?: (code: string) => void
 }
 
-export default function ChatBubble({ message, onCodeExpand }: ChatBubbleProps) {
+export default function ChatBubble({ message, onCodeExpand, onSave, onDelete, onCopy }: ChatBubbleProps) {
   const isUser = message.role === 'user'
 
   return (
@@ -38,6 +41,9 @@ export default function ChatBubble({ message, onCodeExpand }: ChatBubbleProps) {
             backtest={message.backtest}
             codeExpanded={message.codeExpanded || false}
             onCodeExpand={onCodeExpand}
+            onSave={onSave}
+            onDelete={onDelete}
+            onCopy={onCopy}
           />
         )}
       </div>

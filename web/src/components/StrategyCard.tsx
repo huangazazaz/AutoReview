@@ -7,6 +7,9 @@ interface StrategyCardProps {
   backtest?: AIStrategyBacktest
   codeExpanded: boolean
   onCodeExpand: (id: number) => void
+  onSave?: (strategy: StrategyResult) => void
+  onDelete?: (name: string) => void
+  onCopy?: (code: string) => void
 }
 
 export default function StrategyCard({
@@ -15,6 +18,9 @@ export default function StrategyCard({
   backtest,
   codeExpanded,
   onCodeExpand,
+  onSave,
+  onDelete,
+  onCopy,
 }: StrategyCardProps) {
   return (
     <div style={{ marginTop: 14 }}>
@@ -105,7 +111,11 @@ export default function StrategyCard({
                 <button
                   className="code-copy-btn"
                   onClick={() => {
-                    navigator.clipboard.writeText(strategy.python_code)
+                    if (onCopy) {
+                      onCopy(strategy.python_code)
+                    } else {
+                      navigator.clipboard.writeText(strategy.python_code)
+                    }
                   }}
                 >
                   📋 复制
@@ -115,6 +125,28 @@ export default function StrategyCard({
                 <code>{strategy.python_code}</code>
               </pre>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      {strategy && (onSave || onDelete) && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+          {onSave && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => onSave(strategy)}
+            >
+              💾 保存策略
+            </button>
+          )}
+          {onDelete && (
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={() => onDelete(strategy.name)}
+            >
+              🗑 删除
+            </button>
           )}
         </div>
       )}

@@ -6,6 +6,7 @@ import { PageHero, PageHeader, EmptyState, TrendIndicator } from '@/components/U
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
 import Select from 'react-select'
+import CreatableSelect from 'react-select/creatable'
 import type { AnalyzeResult, StrategyInfo, Bar, Trade, CachedStock } from '@/types'
 import * as echarts from 'echarts'
 
@@ -450,35 +451,32 @@ export default function Analyze() {
           <div className="form-row">
             <div className="form-group" style={{ flex: 2 }}>
               <label className="form-label" htmlFor="analyze-symbol">
-                股票代码
+                股票
               </label>
-              <div className="input-with-clear">
-                <input
-                  id="analyze-symbol"
-                  className="form-input"
-                  type="text"
-                  list="analyze-stock-list"
-                  placeholder="例如 AAPL / 600519"
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                  autoComplete="off"
-                />
-                {symbol && (
-                  <button
-                    type="button"
-                    className="input-clear-btn visible"
-                    onClick={() => setSymbol('')}
-                    aria-label="清除"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-              <datalist id="analyze-stock-list">
-                {cachedStocks.map((s) => (
-                  <option key={s.symbol} value={s.symbol} />
-                ))}
-              </datalist>
+              <CreatableSelect
+                id="analyze-symbol"
+                placeholder="输入代码或名称搜索股票…"
+                options={cachedStocks.map(s => ({
+                  value: s.symbol,
+                  label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
+                }))}
+                value={symbol ? cachedStocks.find(s => s.symbol === symbol.toUpperCase())
+                  ? { value: symbol.toUpperCase(), label: `${symbol.toUpperCase()}${cachedStocks.find(s => s.symbol === symbol.toUpperCase())?.name ? ` - ${cachedStocks.find(s => s.symbol === symbol.toUpperCase())!.name}` : ''}` }
+                  : { value: symbol.toUpperCase(), label: symbol.toUpperCase() }
+                  : null}
+                onChange={(o) => setSymbol(o?.value?.toUpperCase() || '')}
+                onCreateOption={(input) => setSymbol(input.toUpperCase())}
+                filterOption={(opt, input) => {
+                  const q = input.toLowerCase()
+                  return opt.data.label.toLowerCase().includes(q)
+                }}
+                isClearable
+                isSearchable
+                className="react-select"
+                classNamePrefix="rs"
+                noOptionsMessage={() => '未找到，输入代码后按回车创建'}
+                formatCreateLabel={(v) => `使用 "${v.toUpperCase()}"`}
+              />
             </div>
 
             <div className="form-group" style={{ flex: 2 }}>

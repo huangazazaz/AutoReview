@@ -7,6 +7,7 @@ import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, escapeHtml } from '@/utils/format'
 import Select from 'react-select'
+import CreatableSelect from 'react-select/creatable'
 import type { StrategyInfo, BacktestSummary, BacktestResultItem, CachedStock, GroupInfo } from '@/types'
 
 /* ------------------------------------------------------------------ */
@@ -486,28 +487,43 @@ const Backtest = () => {
                 <div className="form-row">
                   <div className="form-group" style={{ flex: 1 }}>
                     <label className="form-label" htmlFor="symbols-input">
-                      股票代码
+                      股票
                     </label>
-                    <div className="input-with-clear">
-                      <input
-                        id="symbols-input"
-                        type="text"
-                        className="form-input"
-                        placeholder="输入股票代码，用逗号分隔，例如: AAPL, GOOGL, MSFT"
-                        value={symbols}
-                        onChange={(e) => setSymbols(e.target.value)}
-                      />
-                      {symbols && (
-                        <button
-                          type="button"
-                          className="input-clear-btn visible"
-                          onClick={() => setSymbols('')}
-                          aria-label="清除"
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
+                    <CreatableSelect
+                      id="symbols-input"
+                      isMulti
+                      placeholder="输入代码或名称搜索股票，支持多选…"
+                      options={cachedStocks.map(s => ({
+                        value: s.symbol,
+                        label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
+                      }))}
+                      value={symbolsArray.map(code => {
+                        const s = cachedStocks.find(c => c.symbol === code)
+                        return s
+                          ? { value: s.symbol, label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}` }
+                          : { value: code, label: code }
+                      })}
+                      onChange={(items) => {
+                        const codes = items.map(i => i.value)
+                        setSymbols(codes.join(', '))
+                      }}
+                      onCreateOption={(input) => {
+                        const code = input.toUpperCase()
+                        if (!symbolsArray.includes(code)) {
+                          setSymbols(symbols ? `${symbols}, ${code}` : code)
+                        }
+                      }}
+                      filterOption={(opt, input) => {
+                        const q = input.toLowerCase()
+                        return opt.data.label.toLowerCase().includes(q)
+                      }}
+                      isClearable
+                      isSearchable
+                      className="react-select"
+                      classNamePrefix="rs"
+                      noOptionsMessage={() => '未找到，输入代码后按回车添加'}
+                      formatCreateLabel={(v) => `添加 "${v.toUpperCase()}"`}
+                    />
                   </div>
                 </div>
 

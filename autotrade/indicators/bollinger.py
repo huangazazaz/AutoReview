@@ -19,10 +19,10 @@ class BollingerBands(Indicator):
     params = {"period": 20, "std": 2}
 
     def __init__(self, period: int = 20, std: float = 2.0):
-        self.period = period
-        self.std = std
+        self.period = int(period)
+        self.std = float(std)
         self.name = "bb"
-        self.params = {"period": period, "std": std}
+        self.params = {"period": self.period, "std": self.std}
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         if f"ind_bb_upper_{self.period}" in df.columns:

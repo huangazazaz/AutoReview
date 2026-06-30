@@ -18,11 +18,11 @@ class MACD(Indicator):
     params = {"fast": 12, "slow": 26, "signal": 9}
 
     def __init__(self, fast: int = 12, slow: int = 26, signal: int = 9):
-        self.fast = fast
-        self.slow = slow
-        self.signal = signal
+        self.fast = int(fast)
+        self.slow = int(slow)
+        self.signal = int(signal)
         self.name = "macd"
-        self.params = {"fast": fast, "slow": slow, "signal": signal}
+        self.params = {"fast": self.fast, "slow": self.slow, "signal": self.signal}
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         if "ind_macd_macd" in df.columns:

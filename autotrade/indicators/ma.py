@@ -17,10 +17,10 @@ class MA(Indicator):
     params = {"period": 20}
 
     def __init__(self, period: int = 20, mode: str = "sma"):
-        self.period = period
+        self.period = int(period)
         self.mode = mode
         self.name = "ma"
-        self.params = {"period": period, "mode": mode}
+        self.params = {"period": self.period, "mode": mode}
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         col = f"ind_ma_{self.period}"
@@ -39,9 +39,9 @@ class EMA(Indicator):
     params = {"period": 20}
 
     def __init__(self, period: int = 20):
-        self.period = period
+        self.period = int(period)
         self.name = "ema"
-        self.params = {"period": period}
+        self.params = {"period": self.period}
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         col = f"ind_ema_{self.period}"

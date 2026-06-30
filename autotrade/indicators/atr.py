@@ -15,9 +15,9 @@ class ATR(Indicator):
     params = {"period": 20}
 
     def __init__(self, period: int = 20):
-        self.period = period
+        self.period = int(period)
         self.name = "atr"
-        self.params = {"period": period}
+        self.params = {"period": self.period}
 
     def compute(self, df: pd.DataFrame) -> pd.DataFrame:
         col = f"ind_atr_{self.period}"

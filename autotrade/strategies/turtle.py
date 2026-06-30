@@ -65,23 +65,23 @@ class TurtleTraderStrategy(Strategy):
         self.system1_exit = int(system1_exit)
         self.system2_entry = int(system2_entry)
         self.system2_exit = int(system2_exit)
-        self.use_system1 = int(use_system1)
-        self.use_system2 = int(use_system2)
+        self.use_system1 = use_system1 if isinstance(use_system1, bool) else str(use_system1).lower() in ("true", "1", "yes")
+        self.use_system2 = use_system2 if isinstance(use_system2, bool) else str(use_system2).lower() in ("true", "1", "yes")
         self.atr_period = int(atr_period)
         self.account_risk_pct = float(account_risk_pct)
         self.max_units = int(max_units)
         self.pyramid_atr_mult = float(pyramid_atr_mult)
         self.stop_atr_mult = float(stop_atr_mult)
-        self.allow_long = int(allow_long)
-        self.allow_short = int(allow_short)
-        self.skip_if_last_win_sys1 = int(skip_if_last_win_sys1)
-        self.use_trend_filter = int(use_trend_filter)
+        self.allow_long = str(allow_long).lower() in ("true", "1", "yes") if not isinstance(allow_long, bool) else allow_long
+        self.allow_short = str(allow_short).lower() in ("true", "1", "yes") if not isinstance(allow_short, bool) else allow_short
+        self.skip_if_last_win_sys1 = str(skip_if_last_win_sys1).lower() in ("true", "1", "yes") if not isinstance(skip_if_last_win_sys1, bool) else skip_if_last_win_sys1
+        self.use_trend_filter = str(use_trend_filter).lower() in ("true", "1", "yes") if not isinstance(use_trend_filter, bool) else use_trend_filter
         self.trend_ma_fast = int(trend_ma_fast)
         self.trend_ma_slow = int(trend_ma_slow)
-        self.use_volume_filter = int(use_volume_filter)
+        self.use_volume_filter = str(use_volume_filter).lower() in ("true", "1", "yes") if not isinstance(use_volume_filter, bool) else use_volume_filter
         self.volume_ma_period = int(volume_ma_period)
         self.volume_mult = float(volume_mult)
-        self.use_trailing_profit = int(use_trailing_profit)
+        self.use_trailing_profit = str(use_trailing_profit).lower() in ("true", "1", "yes") if not isinstance(use_trailing_profit, bool) else use_trailing_profit
         self.trailing_profit_pct = int(trailing_profit_pct)
 
         self.required_indicators = [ATR(period=atr_period)]

@@ -75,7 +75,7 @@ class TrendMABreakoutStrategy(Strategy):
         ]
 
         # 分批买入
-        self.batch_entry = int(batch_entry)
+        self.batch_entry = str(batch_entry).lower() in ("true", "1", "yes") if not isinstance(batch_entry, bool) else batch_entry
         self.batches = batches or [1.0]
         self.batch_triggers = batch_triggers or [0.0]
 

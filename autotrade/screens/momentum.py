@@ -41,7 +41,9 @@ def _atr(df: pd.DataFrame, length: int) -> pd.Series:
         (high - prev_close).abs(),
         (low - prev_close).abs(),
     ], axis=1).max(axis=1)
-    return tr.ewm(alpha=1 / length, adjust=False).mean()
+    atr = tr.ewm(alpha=1 / length, adjust=False).mean()
+    atr.iloc[:length] = float('nan')
+    return atr
 
 
 class MomentumScreener(Screener):

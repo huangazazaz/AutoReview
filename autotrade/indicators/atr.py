@@ -31,5 +31,8 @@ class ATR(Indicator):
             (high - prev_close).abs(),
             (low - prev_close).abs(),
         ], axis=1).max(axis=1)
-        df[col] = tr.ewm(alpha=1 / self.period, adjust=False).mean()
+        # Use Wilder's smoothing: first value is SMA, then EMA
+        atr = tr.ewm(alpha=1 / self.period, adjust=False).mean()
+        atr.iloc[:self.period] = float('nan')
+        df[col] = atr
         return df

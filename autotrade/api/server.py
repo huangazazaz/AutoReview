@@ -1172,23 +1172,28 @@ if not _frontend_dir.exists():
 
 if _frontend_dir.exists():
     from fastapi.responses import FileResponse
+    from starlette.middleware.base import BaseHTTPMiddleware
     import mimetypes
 
-    # SPA fallback: serve static files, fall back to index.html for client-side routes
-    async def _serve_frontend(path: str) -> FileResponse:
-        requested_path = _frontend_dir / path
-        # Serve existing static files directly (JS, CSS, images, assets)
-        if path and requested_path.exists() and requested_path.is_file():
-            media_type, _ = mimetypes.guess_type(str(requested_path))
-            return FileResponse(requested_path, media_type=media_type or "application/octet-stream")
-        # For all other paths, serve index.html (SPA client-side routing)
-        index_path = _frontend_dir / "index.html"
-        return FileResponse(index_path)
+    class SPAMiddleware(BaseHTTPMiddleware):
+        """Serve static files and fall back to index.html for SPA routes."""
+        async def dispatch(self, request, call_next):
+            # Let API routes handle their own requests
+            response = await call_next(request)
+            if response.status_code != 404:
+                return response
 
-    @app.get("/{path:path}", include_in_schema=False)
-    async def serve_frontend(path: str):
-        return await _serve_frontend(path)
+            # For 404 responses, try serving a static file or index.html
+            path = request.url.path.lstrip("/")
+            requested_path = _frontend_dir / path
+            if path and requested_path.exists() and requested_path.is_file():
+                media_type, _ = mimetypes.guess_type(str(requested_path))
+                return FileResponse(requested_path, media_type=media_type or "application/octet-stream")
 
-    @app.get("/", include_in_schema=False)
-    async def serve_root():
-        return await _serve_frontend("")
+            index_path = _frontend_dir / "index.html"
+            if index_path.exists():
+                return FileResponse(index_path)
+
+            return response
+
+    app.add_middleware(SPAMiddleware)

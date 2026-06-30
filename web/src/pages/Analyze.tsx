@@ -65,7 +65,7 @@ function getReasonTag(reason: string): string {
   return escapeHtml(reason)
 }
 
-/** Build the full ECharts option for the equity-curve chart. */
+/** Build the full ECharts option for the equity-curve + K-line chart. */
 function buildChartOption(
   result: AnalyzeResult,
   trades: Trade[],
@@ -75,7 +75,7 @@ function buildChartOption(
   if (curve.length === 0) {
     return {
       backgroundColor: '#1E293B',
-      title: { text: '权益曲线', left: 'center', textStyle: { color: '#E2E8F0', fontSize: 16 } },
+      title: { text: '权益曲线 + K线', left: 'center', textStyle: { color: '#E2E8F0', fontSize: 16 } },
       graphic: { type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fill: '#94A3B8', fontSize: 18 } },
     }
   }
@@ -86,24 +86,34 @@ function buildChartOption(
   const closeData = curve.map((d: any) => (d.close != null ? d.close : null))
 
   const initialCapital = equityData.length > 0 ? equityData[0] : 100_000
-  const baselineData = dates.map(() => initialCapital)
 
   // Buy / Sell scatter points
   const buyData: [string, number][] = []
   const sellData: [string, number][] = []
-
   for (const trade of trades) {
     const idx = dates.indexOf(trade.date)
     if (idx < 0) continue
     const point: [string, number] = [trade.date, equityData[idx]]
-    if (trade.action === 'BUY') {
-      buyData.push(point)
-    } else {
-      sellData.push(point)
-    }
+    if (trade.action === 'BUY') { buyData.push(point) } else { sellData.push(point) }
   }
 
-  // Gradient fills
+  // K-line data from bars: [open, close, low, high]
+  const barMap = new Map<string, Bar>(_bars.map((b: Bar) => [b.date, b] as [string, Bar]))
+  const klineData: number[][] = []
+  const volumeData: { value: number; itemStyle: { color: string } }[] = []
+  dates.forEach((d: string) => {
+    const b = barMap.get(d)
+    if (b) {
+      klineData.push([b.open, b.close, b.low, b.high])
+      const color = b.close >= b.open ? '#10B98133' : '#EF444433'
+      volumeData.push({ value: b.volume, itemStyle: { color } })
+    } else {
+      klineData.push([0, 0, 0, 0])
+      volumeData.push({ value: 0, itemStyle: { color: '#475569' } })
+    }
+  })
+
+  // Gradients
   const purpleGradient = new echarts.graphic.LinearGradient(0, 0, 0, 1, [
     { offset: 0, color: 'rgba(168, 85, 247, 0.35)' },
     { offset: 1, color: 'rgba(168, 85, 247, 0.02)' },
@@ -113,10 +123,13 @@ function buildChartOption(
     { offset: 1, color: 'rgba(16, 185, 129, 0.02)' },
   ])
 
+  // Grid layout: equity (top 32%), drawdown (middle 10%), K-line (bottom 58%)
+  const datesX = dates.map((d: any) => String(d).length > 10 ? String(d).slice(5) : String(d))
+
   return {
     backgroundColor: '#1E293B',
     title: {
-      text: '权益曲线',
+      text: '权益曲线 + K线',
       left: 'center',
       textStyle: { color: '#E2E8F0', fontSize: 16, fontWeight: 600 },
       top: 8,
@@ -126,142 +139,81 @@ function buildChartOption(
       textStyle: { color: '#94A3B8', fontSize: 11 },
       itemWidth: 18,
       itemHeight: 10,
+      data: ['权益', '收盘价', '回撤', '买入', '卖出'],
+      selected: { '买入': true, '卖出': true, '收盘价': false },
     },
     tooltip: {
       trigger: 'axis',
       backgroundColor: 'rgba(15, 23, 42, 0.92)',
       borderColor: '#475569',
       textStyle: { color: '#E2E8F0', fontSize: 12 },
+      axisPointer: {
+        type: 'cross',
+        link: [{ xAxisIndex: 'all' }],
+        label: { backgroundColor: '#334155' },
+      },
+    },
+    axisPointer: {
+      link: [{ xAxisIndex: 'all' }],
     },
     grid: [
-      { left: '8%', right: '10%', top: 52, height: '42%' },
-      { left: '8%', right: '10%', top: '63%', height: '18%' },
+      { left: '8%', right: '10%', top: 48, height: '30%' },
+      { left: '8%', right: '10%', top: '49%', height: '8%' },
+      { left: '8%', right: '10%', top: '58%', height: '28%' },
+      { left: '8%', right: '10%', top: '87%', height: '10%' },
     ],
     xAxis: [
-      {
-        type: 'category',
-        data: dates,
-        gridIndex: 0,
-        axisLine: { lineStyle: { color: '#334155' } },
-        axisLabel: { color: '#94A3B8', fontSize: 10 },
-        axisTick: { show: false },
-      },
-      {
-        type: 'category',
-        data: dates,
-        gridIndex: 1,
-        axisLine: { lineStyle: { color: '#334155' } },
-        axisLabel: { color: '#94A3B8', fontSize: 10 },
-        axisTick: { show: false },
-      },
+      { type: 'category', data: datesX, gridIndex: 0, axisLine: { lineStyle: { color: '#334155' } }, axisLabel: { color: '#94A3B8', fontSize: 10 }, axisTick: { show: false } },
+      { type: 'category', data: datesX, gridIndex: 1, axisLine: { lineStyle: { color: '#334155' } }, axisLabel: { show: false }, axisTick: { show: false } },
+      { type: 'category', data: datesX, gridIndex: 2, axisLine: { lineStyle: { color: '#334155' } }, axisLabel: { show: false }, axisTick: { show: false } },
+      { type: 'category', data: datesX, gridIndex: 3, axisLine: { lineStyle: { color: '#334155' } }, axisLabel: { color: '#94A3B8', fontSize: 10 }, axisTick: { show: false } },
     ],
     yAxis: [
-      {
-        type: 'value',
-        gridIndex: 0,
-        name: '权益',
-        nameTextStyle: { color: '#94A3B8', fontSize: 11 },
-        axisLabel: { color: '#94A3B8', fontSize: 10, formatter: (v: number) => formatAmount(v) },
-        splitLine: { lineStyle: { color: '#1E293B' } },
-      },
-      {
-        type: 'value',
-        gridIndex: 0,
-        name: '价格',
-        nameTextStyle: { color: '#94A3B8', fontSize: 11 },
-        axisLabel: { color: '#94A3B8', fontSize: 10, formatter: (v: number) => formatNumber(v) },
-        splitLine: { show: false },
-      },
-      {
-        type: 'value',
-        gridIndex: 1,
-        name: '回撤%',
-        nameTextStyle: { color: '#94A3B8', fontSize: 11 },
-        axisLabel: { color: '#94A3B8', fontSize: 10, formatter: (v: number) => `${(v * 100).toFixed(1)}%` },
-        splitLine: { lineStyle: { color: '#1E293B' } },
-      },
+      { type: 'value', gridIndex: 0, name: '权益', nameTextStyle: { color: '#94A3B8', fontSize: 11 }, axisLabel: { color: '#94A3B8', fontSize: 10, formatter: (v: number) => formatAmount(v) }, splitLine: { lineStyle: { color: '#1E293B' } } },
+      { type: 'value', gridIndex: 0, name: '价格', nameTextStyle: { color: '#94A3B8', fontSize: 11 }, axisLabel: { color: '#94A3B8', fontSize: 10, formatter: (v: number) => formatNumber(v) }, splitLine: { show: false } },
+      { type: 'value', gridIndex: 1, name: '回撤%', nameTextStyle: { color: '#94A3B8', fontSize: 10 }, axisLabel: { color: '#94A3B8', fontSize: 9, formatter: (v: number) => `${(v * 100).toFixed(0)}%` }, splitLine: { lineStyle: { color: '#1E293B' } } },
+      { type: 'value', gridIndex: 2, name: '价格', nameTextStyle: { color: '#94A3B8', fontSize: 10 }, axisLabel: { color: '#94A3B8', fontSize: 10, formatter: (v: number) => formatNumber(v) }, splitLine: { lineStyle: { color: '#1E293B' } } },
+      { type: 'value', gridIndex: 3, name: '量', nameTextStyle: { color: '#94A3B8', fontSize: 10 }, axisLabel: { color: '#94A3B8', fontSize: 9, formatter: (v: number) => formatVolume(v) }, splitLine: { show: false } },
     ],
     dataZoom: [
-      { type: 'inside', xAxisIndex: [0, 1], start: 0, end: 100 },
-      { type: 'slider', xAxisIndex: [0, 1], bottom: 28, height: 16, borderColor: '#334155', backgroundColor: '#0F172A', dataBackground: { lineStyle: { color: '#475569' }, areaStyle: { color: '#1E293B' } }, selectedDataBackground: { lineStyle: { color: '#A855F7' }, areaStyle: { color: 'rgba(168,85,247,0.15)' } }, textStyle: { color: '#94A3B8' } },
+      { type: 'inside', xAxisIndex: [0, 1, 2, 3], start: 0, end: 100 },
+      { type: 'slider', xAxisIndex: [0, 1, 2, 3], bottom: 28, height: 16, borderColor: '#334155', backgroundColor: '#0F172A', dataBackground: { lineStyle: { color: '#475569' }, areaStyle: { color: '#1E293B' } }, selectedDataBackground: { lineStyle: { color: '#A855F7' }, areaStyle: { color: 'rgba(168,85,247,0.15)' } }, textStyle: { color: '#94A3B8' } },
     ],
     series: [
       {
-        name: '初始资金',
-        type: 'line',
-        data: baselineData,
-        lineStyle: { type: 'dashed', color: '#64748B', width: 1 },
-        itemStyle: { color: '#64748B' },
-        symbol: 'none',
-        z: 1,
+        name: '权益', type: 'line', data: equityData, smooth: true,
+        lineStyle: { color: '#A855F7', width: 2 }, itemStyle: { color: '#A855F7' }, symbol: 'none',
+        areaStyle: { color: purpleGradient }, z: 2,
+        markPoint: { data: [{ type: 'max', name: '最高' }, { type: 'min', name: '最低' }], symbol: 'pin', symbolSize: 28, label: { color: '#E2E8F0', fontSize: 10 }, itemStyle: { color: '#A855F7' } },
       },
       {
-        name: '权益',
-        type: 'line',
-        data: equityData,
-        smooth: true,
-        lineStyle: { color: '#A855F7', width: 2 },
-        itemStyle: { color: '#A855F7' },
-        symbol: 'none',
-        areaStyle: { color: purpleGradient },
-        z: 2,
-        markPoint: {
-          data: [
-            { type: 'max', name: '最高' },
-            { type: 'min', name: '最低' },
-          ],
-          symbol: 'pin',
-          symbolSize: 32,
-          label: { color: '#E2E8F0', fontSize: 10 },
-          itemStyle: { color: '#A855F7' },
-        },
+        name: '收盘价', type: 'line', yAxisIndex: 1, data: closeData, smooth: true,
+        lineStyle: { color: '#F59E0B', width: 1, type: 'dashed' }, itemStyle: { color: '#F59E0B' }, symbol: 'none', z: 1,
       },
       {
-        name: '收盘价',
-        type: 'line',
-        yAxisIndex: 1,
-        data: closeData,
-        smooth: true,
-        lineStyle: { color: '#F59E0B', width: 1, type: 'dashed' },
-        itemStyle: { color: '#F59E0B' },
-        symbol: 'none',
-        z: 1,
+        name: '回撤', type: 'line', xAxisIndex: 1, yAxisIndex: 2, data: drawdownData,
+        lineStyle: { color: '#10B981', width: 1.5 }, itemStyle: { color: '#10B981' },
+        areaStyle: { color: greenGradient }, symbol: 'none', z: 1,
       },
+      // K-line candlestick
       {
-        name: '回撤',
-        type: 'line',
-        xAxisIndex: 1,
-        yAxisIndex: 2,
-        data: drawdownData,
-        lineStyle: { color: '#10B981', width: 1.5 },
-        itemStyle: { color: '#10B981' },
-        areaStyle: { color: greenGradient },
-        symbol: 'none',
+        name: 'K线', type: 'candlestick', xAxisIndex: 2, yAxisIndex: 3, data: klineData,
+        itemStyle: { color: '#EF4444', color0: '#10B981', borderColor: '#EF4444', borderColor0: '#10B981' },
+        z: 3,
+      },
+      // Volume
+      {
+        name: '成交量', type: 'bar', xAxisIndex: 3, yAxisIndex: 4, data: volumeData,
         z: 1,
       },
-      ...(buyData.length > 0
-        ? [{
-            name: '买入',
-            type: 'scatter' as const,
-            data: buyData.map(([d, v]) => [d, v]),
-            symbol: 'triangle',
-            symbolSize: 14,
-            itemStyle: { color: '#EF4444' },
-            z: 10,
-          }]
-        : []),
-      ...(sellData.length > 0
-        ? [{
-            name: '卖出',
-            type: 'scatter' as const,
-            data: sellData.map(([d, v]) => [d, v]),
-            symbol: 'triangle',
-            symbolSize: 14,
-            symbolRotate: 180,
-            itemStyle: { color: '#22C55E' },
-            z: 10,
-          }]
-        : []),
+      ...(buyData.length > 0 ? [{
+        name: '买入', type: 'scatter' as const, data: buyData.map(([d, v]) => [d, v]),
+        symbol: 'triangle', symbolSize: 14, itemStyle: { color: '#FF4444' }, z: 10,
+      }] : []),
+      ...(sellData.length > 0 ? [{
+        name: '卖出', type: 'scatter' as const, data: sellData.map(([d, v]) => [d, v]),
+        symbol: 'triangle', symbolSize: 14, symbolRotate: 180, itemStyle: { color: '#22C55E' }, z: 10,
+      }] : []),
     ],
   } as echarts.EChartsOption
 }

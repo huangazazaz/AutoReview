@@ -41,6 +41,7 @@ except ImportError:
 
 from fastapi import FastAPI, HTTPException, Query, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -87,6 +88,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---- GZip 压缩（加速静态资源传输）----
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # ---- API 路由（统一前缀 /api）----
 api_router = APIRouter(prefix="/api")

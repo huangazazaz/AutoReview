@@ -107,14 +107,15 @@ _SPA_INDEX = Path(__file__).resolve().parent.parent.parent / "web" / "dist" / "i
 
 class SPAFallbackMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Only intercept GET requests from browsers (Accept: text/html)
+        # Only intercept GET requests that are page navigations, not API calls.
+        # Sec-Fetch-Dest: document = browser page load
+        # Sec-Fetch-Dest: empty/other = fetch()/XHR API call
         if request.method == "GET" and _SPA_INDEX.exists():
-            accept = request.headers.get("accept", "")
-            if "text/html" in accept:
+            fetch_dest = request.headers.get("sec-fetch-dest", "")
+            if fetch_dest == "document":
                 path = request.url.path
-                # Serve index.html for known SPA routes or paths that look like
-                # page navigations (no file extension, not an API-only path)
-                is_spa = path in _SPA_ROUTES or (
+                # Serve index.html for known SPA routes
+                if path in _SPA_ROUTES or (
                     "/" in path
                     and "." not in path.rsplit("/", 1)[-1]
                     and not path.startswith("/assets/")
@@ -122,8 +123,7 @@ class SPAFallbackMiddleware(BaseHTTPMiddleware):
                     and not path.startswith("/ai/")
                     and not path.startswith("/cache/")
                     and path not in ("/health", "/strategies", "/datasources")
-                )
-                if is_spa:
+                ):
                     from fastapi.responses import FileResponse
                     return FileResponse(_SPA_INDEX)
         return await call_next(request)

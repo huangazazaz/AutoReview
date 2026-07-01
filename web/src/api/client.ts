@@ -19,6 +19,9 @@ import type {
   LoginRequest,
   RegisterRequest,
   UserInfo,
+  ScreenerInfo,
+  ScreenRequest,
+  ScreenResult,
 } from '@/types'
 
 const BASE = '/api'
@@ -195,4 +198,9 @@ export const api = {
   register: (params: RegisterRequest) => post<AuthResponse>('/auth/register', params),
 
   me: () => get<UserInfo>('/auth/me'),
+
+  // ---- 选股 / Screener ----
+  getScreeners: () => get<{ screeners: ScreenerInfo[] }>('/screeners'),
+
+  screen: (data: ScreenRequest) => post<ScreenResult>('/screen', data),
 }

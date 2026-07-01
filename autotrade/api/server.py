@@ -45,9 +45,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from autotrade.core.engine import analyze_stock, run_backtest, run_portfolio_backtest
+from autotrade.core.engine import analyze_stock, run_backtest, run_portfolio_backtest, run_screen
 from autotrade.registry import (
-    init_registry, list_datasources, list_strategies,
+    init_registry, list_datasources, list_strategies, list_screens, get_screener,
     is_builtin_strategy, is_builtin_group,
 )
 from autotrade.ai.session_store import SessionStore, ChatMessage as StoreChatMessage
@@ -137,6 +137,16 @@ class PortfolioBacktestRequest(BaseModel):
     symbols: Optional[str] = None          # 逗号分隔代码列表
     group: Optional[str] = None            # 分组ID（优先于 symbols）
     datasource: Optional[str] = None
+
+
+class ScreenRequest(BaseModel):
+    """选股扫描请求。"""
+    screener: str = "momentum_screener"
+    strategy: str = "ma_cross"
+    date: str  # "YYYY-MM-DD"
+    top_n: int = 20
+    screener_params: Optional[dict] = None
+    strategy_params: Optional[dict] = None
 
 
 class GenerateStrategyRequest(BaseModel):
@@ -723,6 +733,101 @@ def api_list_strategies():
         result.append(info)
 
     return {"strategies": result}
+
+
+@api_router.get("/screeners")
+def api_list_screeners():
+    """列出可用选股器及其参数信息。"""
+    import yaml
+    import inspect
+
+    result = []
+    for name in list_screens():
+        info: dict = {"name": name, "params": {}, "param_schema": {}}
+        # 加载 YAML 配置的当前参数值
+        cfg_path = _ROOT / "config" / "screens" / f"{name}.yaml"
+        if cfg_path.exists():
+            try:
+                with open(cfg_path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                info["params"] = data.get("params", {}) or {}
+            except Exception:
+                pass
+
+        # 从选股器类的构造函数提取参数 schema
+        try:
+            screener_cls = get_screener(name)
+            sig = inspect.signature(screener_cls.__init__)
+            param_schema = {}
+            for pname, p in sig.parameters.items():
+                if pname in ("self", "args", "kwargs"):
+                    continue
+                entry: dict = {}
+                if p.default is not inspect.Parameter.empty:
+                    entry["default"] = p.default
+                if p.annotation is not inspect.Parameter.empty:
+                    ann = p.annotation
+                    type_str = _annotation_to_type_str(ann)
+                    if type_str:
+                        entry["type"] = type_str
+                elif p.default is not inspect.Parameter.empty:
+                    entry["type"] = _python_type_to_str(type(p.default))
+                param_schema[pname] = entry
+            info["param_schema"] = param_schema
+        except Exception:
+            pass
+
+        result.append(info)
+
+    return {"screeners": result}
+
+
+@api_router.post("/screen")
+def api_screen_stocks(req: ScreenRequest):
+    """单日选股扫描：Screener 初筛 + Strategy 买点确认。"""
+    from datetime import date as date_cls
+
+    try:
+        target_date = date_cls.fromisoformat(req.date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="日期格式错误，应为 YYYY-MM-DD")
+
+    try:
+        result = run_screen(
+            screener_name=req.screener,
+            strategy_name=req.strategy,
+            target_date=target_date,
+            top_n=req.top_n,
+            screener_params=req.screener_params,
+            strategy_params=req.strategy_params,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("选股扫描失败")
+        raise HTTPException(status_code=500, detail=f"选股扫描失败: {e}")
+
+    # Convert ScreenResult/ScreenItem to dict
+    return {
+        "date": result.date,
+        "screener": result.screener,
+        "strategy": result.strategy,
+        "universe_size": result.universe_size,
+        "candidates": result.candidates,
+        "with_buy_signal": result.with_buy_signal,
+        "results": [
+            {
+                "symbol": r.symbol,
+                "name": r.name,
+                "score": r.score,
+                "signal_tag": r.signal_tag,
+                "factor_breakdown": r.factor_breakdown,
+                "buy_signal": r.buy_signal,
+                "key_metrics": r.key_metrics,
+            }
+            for r in result.results
+        ],
+    }
 
 
 def _annotation_to_type_str(ann) -> str | None:

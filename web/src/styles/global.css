@@ -358,15 +358,13 @@ a:hover { color: var(--accent-hover); }
     margin-left: var(--sidebar-width);
     min-height: 100vh;
     min-height: 100dvh;
-    display: flex;
-    justify-content: center;
     padding: var(--space-8);
 }
 
-/* 内容居中包裹层：控制最大阅读宽度 */
+/* 内容居中包裹层：控制最大阅读宽度，margin auto 居中 */
 .content-wrapper {
-    width: 100%;
     max-width: 1280px;
+    margin: 0 auto;
 }
 
 /* ---- 页面标题 ---- */

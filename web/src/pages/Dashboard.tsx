@@ -150,8 +150,16 @@ export default function Dashboard() {
         textAlign: 'center', padding: '48px 0 24px',
         color: 'var(--text-muted)', fontSize: 13,
       }}>
+        <p style={{ margin: '0 0 8px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+          数据源
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap', marginBottom: 16 }}>
+          <span>📡 AKShare — A 股日线实时采集</span>
+          <span>💾 Local — Parquet 本地缓存</span>
+          <span>🐼 Tushare — 专业金融数据接口</span>
+        </div>
         <p style={{ margin: '0 0 4px' }}>
-          数据来源: AKShare · 支持 A 股全市场日线数据
+          支持 A 股全市场 5000+ 只股票日线数据，覆盖历史至今
         </p>
         <p style={{ margin: 0 }}>
           BacktestLab v0.1.0 · dev/autotrade-mvp

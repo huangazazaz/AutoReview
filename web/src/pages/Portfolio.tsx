@@ -298,6 +298,7 @@ function PortfolioEquityChart({ curve, trades }: {
   trades?: PortfolioTrade[]
 }) {
   const chartRef = useRef<HTMLDivElement>(null!)
+  const { initChart, setOption } = useECharts()
   const dates = curve.map(d => d.date)
   const equityData = curve.map(d => d.equity)
 
@@ -353,7 +354,11 @@ function PortfolioEquityChart({ curve, trades }: {
     ],
   }), [dates, equityData, drawdownData, buyPoints, sellPoints])
 
-  useECharts(chartRef, option, [option])
+  useEffect(() => {
+    if (!chartRef.current) return
+    const chart = initChart(chartRef.current)
+    if (chart) setOption(option)
+  }, [initChart, setOption, option])
 
   return (
     <div className="card card-accent" style={{ marginTop: 16 }}>

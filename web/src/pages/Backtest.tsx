@@ -4,13 +4,14 @@ import { useApp } from '@/hooks/useApp'
 import { useECharts } from '@/hooks/useECharts'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { useCachedStrategies } from '@/hooks/useCachedStrategies'
+import { useCachedGroups } from '@/hooks/useCachedGroups'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, escapeHtml } from '@/utils/format'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
-import type { StrategyInfo, BacktestSummary, BacktestResultItem, GroupInfo } from '@/types'
+import type { StrategyInfo, BacktestSummary, BacktestResultItem } from '@/types'
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -93,7 +94,7 @@ const Backtest = () => {
   /* ---- loaded data ----------------------------------------------- */
   const { strategies } = useCachedStrategies()
   const [datasources, setDatasources] = useState<string[]>([])
-  const [groups, setGroups] = useState<GroupInfo[]>([])
+  const { groups } = useCachedGroups()
   const { stocks: cachedStocks } = useCachedStocks()
 
   /* ---- results --------------------------------------------------- */
@@ -125,13 +126,11 @@ const Backtest = () => {
 
     const load = async () => {
       try {
-        const [dsRes, grpRes] = await Promise.all([
+        const [dsRes] = await Promise.all([
           api.getDatasources(),
-          api.getGroups(),
         ])
         if (cancelled) return
         setDatasources(dsRes.datasources ?? [])
-        setGroups(grpRes.groups ?? [])
       } catch (err) {
         if (!cancelled) console.error('Failed to load initial data:', err)
       }

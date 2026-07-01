@@ -3,11 +3,12 @@ import CreatableSelect from 'react-select/creatable'
 import { useApp } from '@/hooks/useApp'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { useCachedStrategies } from '@/hooks/useCachedStrategies'
+import { useCachedGroups } from '@/hooks/useCachedGroups'
 import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
 import { formatNumber, formatPct, formatAmount } from '@/utils/format'
-import type { GroupInfo, PortfolioBacktestResponse } from '@/types'
+import type { PortfolioBacktestResponse } from '@/types'
 
 export default function Portfolio() {
   const { showToast, showLoading: showGlobalLoading, hideLoading } = useApp()
@@ -22,7 +23,7 @@ export default function Portfolio() {
   const [submitting, setSubmitting] = useState(false)
 
   const { strategies } = useCachedStrategies()
-  const [groups, setGroups] = useState<GroupInfo[]>([])
+  const { groups } = useCachedGroups()
   const { stocks: cachedStocks } = useCachedStocks()
   const [result, setResult] = useState<PortfolioBacktestResponse | null>(null)
 
@@ -35,10 +36,6 @@ export default function Portfolio() {
     const usr = strategies.filter(s => !s.is_builtin)
     return { sys, usr }
   }, [strategies])
-
-  useEffect(() => {
-    api.getGroups().then(d => setGroups(d.groups))
-  }, [])
 
   // 默认日期：最近1年
   useEffect(() => {

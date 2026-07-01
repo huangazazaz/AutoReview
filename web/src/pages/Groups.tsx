@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useApp } from '@/hooks/useApp'
+import { useCachedGroups } from '@/hooks/useCachedGroups'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import { escapeHtml } from '@/utils/format'
@@ -20,7 +21,7 @@ function Groups() {
 
   // ── Page state ───────────────────────────────────────────────────────────
 
-  const [groups, setGroups] = useState<GroupInfo[]>([])
+  const { groups, loading: groupsLoading, refresh: refreshGroups } = useCachedGroups()
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null)
   const [groupDetail, setGroupDetail] = useState<GroupInfo | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -43,21 +44,6 @@ function Groups() {
     const usr = groups.filter(g => !g.is_builtin)
     return [...sys, ...usr]
   }, [groups])
-
-  // ── Load group list ──────────────────────────────────────────────────────
-
-  const loadGroups = useCallback(async () => {
-    try {
-      const data = await api.getGroups()
-      setGroups(data.groups)
-    } catch (err: any) {
-      showToast(err?.message || '加载分组列表失败', 'error')
-    }
-  }, [showToast])
-
-  useEffect(() => {
-    loadGroups()
-  }, [loadGroups])
 
   // ── Load group detail ────────────────────────────────────────────────────
 
@@ -110,11 +96,11 @@ function Groups() {
       showToast('分组已删除', 'success')
       setCurrentGroupId(null)
       setGroupDetail(null)
-      await loadGroups()
+      await refreshGroups()
     } catch (err: any) {
       showToast(err?.message || '删除分组失败', 'error')
     }
-  }, [currentGroupId, showConfirm, showToast, loadGroups])
+  }, [currentGroupId, showConfirm, showToast, refreshGroups])
 
   // ── Modal save handler ───────────────────────────────────────────────────
 
@@ -146,7 +132,7 @@ function Groups() {
         })
         showToast('分组创建成功', 'success')
         setModalVisible(false)
-        await loadGroups()
+        await refreshGroups()
         const newId = result?.id ?? modalGroupId.trim()
         setCurrentGroupId(newId)
         await loadGroupDetail(newId)
@@ -157,7 +143,7 @@ function Groups() {
         })
         showToast('分组更新成功', 'success')
         setModalVisible(false)
-        await loadGroups()
+        await refreshGroups()
         setCurrentGroupId(modalGroupId.trim())
         await loadGroupDetail(modalGroupId.trim())
       }
@@ -166,7 +152,7 @@ function Groups() {
     } finally {
       setModalSaving(false)
     }
-  }, [modalMode, modalGroupId, modalGroupName, modalSymbols, showToast, loadGroups, loadGroupDetail])
+  }, [modalMode, modalGroupId, modalGroupName, modalSymbols, showToast, refreshGroups, loadGroupDetail])
 
   // ── Open modal ───────────────────────────────────────────────────────────
 
@@ -223,7 +209,12 @@ function Groups() {
             </button>
           </div>
           <div className="card-body">
-            {groups.length === 0 ? (
+            {groupsLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                <div className="spinner" style={{ margin: '0 auto 1rem' }} />
+                <p>加载分组列表…</p>
+              </div>
+            ) : groups.length === 0 ? (
               <div className="empty-state-enhanced">
                 <div className="empty-icon-bg">
                   <span className="empty-icon" aria-hidden="true">

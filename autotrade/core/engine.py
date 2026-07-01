@@ -508,6 +508,206 @@ def run_screener_backtest(
     return summary
 
 
+# ---- 单日选股 ----
+
+def run_screen(
+    screener_name: str,
+    strategy_name: str,
+    target_date: date,
+    top_n: int = 20,
+    screener_params: dict[str, Any] | None = None,
+    strategy_params: dict[str, Any] | None = None,
+    datasource_name: str = FAILOVER_NAME,
+) -> ScreenResult:
+    """单日选股扫描：Screener 初筛 → Strategy 确认买点 → 因子明细。
+
+    流程:
+      1. 加载全市场 OHLCV（回溯窗口由 screener+strategy 所需最大天数决定）
+      2. Screener.scan() → 候选列表
+      3. 对每只候选跑 Strategy.generate_signals() → 筛选有 BUY 的
+      4. Screener.explain() → 因子明细
+      5. 提取关键指标 → 排序返回
+
+    Args:
+        screener_name: 选股器名称（如 "momentum_screener"）
+        strategy_name: 交易策略名称（如 "ma_cross"）
+        target_date: 目标日期
+        top_n: 返回前 N 只
+        screener_params: 选股器参数覆盖
+        strategy_params: 策略参数覆盖
+        datasource_name: 数据源名称
+
+    Returns:
+        ScreenResult 包含候选列表、买点信息和因子明细。
+    """
+    from autotrade.core.models import ScreenResult, ScreenItem
+
+    init_registry()
+
+    # ---- 1. 确定回溯窗口 ----
+    lookback_days = 120
+    start = target_date - pd.Timedelta(days=lookback_days * 2)
+    end = target_date
+
+    # ---- 2. 加载全市场数据 ----
+    ds = build_datasource_from_name(datasource_name)
+    all_symbols = ds.list_symbols()
+
+    # 排除 ST
+    st_exclude = _load_st_exclusion_set()
+    if st_exclude:
+        all_symbols = [s for s in all_symbols if s not in st_exclude]
+        logger.info("排除 ST 后剩余 %d 只", len(all_symbols))
+
+    market_data = _load_market_data(all_symbols, start, end)
+    if not market_data:
+        return ScreenResult(date=str(target_date), screener=screener_name,
+                            strategy=strategy_name, universe_size=0)
+
+    # ---- 3. 运行 Screener ----
+    s_params = screener_params
+    if s_params is None:
+        s_params = _load_screener_params(screener_name)
+    screener_cls = get_screener(screener_name)
+    screener = screener_cls(**s_params)
+    selection = screener.scan(market_data, [target_date])
+
+    candidates = selection.get(target_date, [])
+    logger.info("Screener '%s' 在 %s 选出 %d 只候选",
+                screener_name, target_date, len(candidates))
+
+    if not candidates:
+        return ScreenResult(date=str(target_date), screener=screener_name,
+                            strategy=strategy_name, universe_size=len(market_data),
+                            candidates=0)
+
+    # ---- 4. 运行 Strategy 确认买点 ----
+    t_params = strategy_params
+    if t_params is None:
+        t_params = get_strategy_params(strategy_name).get("params", {}) or {}
+    strategy_cls = get_strategy(strategy_name)
+    strategy = strategy_cls(**t_params)
+
+    # 计算指标列
+    for indicator in strategy.required_indicators:
+        for sym, _score, _tag in candidates:
+            df = market_data.get(sym)
+            if df is not None:
+                try:
+                    indicator.compute(df)
+                except Exception:
+                    pass
+
+    # ---- 5. 构建结果列表 ----
+    results: list[ScreenItem] = []
+    name_map = _build_stock_name_map_safe()
+
+    for sym, score, tag in candidates:
+        df = market_data.get(sym)
+        if df is None:
+            continue
+
+        idx = _screener_index_of(df, target_date)
+        if idx is None:
+            continue
+
+        # 提取关键指标
+        key_metrics: dict[str, Any] = {}
+        try:
+            key_metrics["close"] = round(float(df["close"].iloc[idx]), 2)
+            key_metrics["volume"] = int(df["volume"].iloc[idx])
+            amt_col = df.get("amount")
+            if amt_col is not None:
+                key_metrics["amount"] = round(float(amt_col.iloc[idx]), 0)
+            else:
+                key_metrics["amount"] = 0
+            # 提取 MA 列（如果存在）
+            for col in df.columns:
+                if col.startswith("ind_ma_") or col.startswith("_ma_"):
+                    val = float(df[col].iloc[idx])
+                    if not pd.isna(val):
+                        label = col.replace("ind_ma_", "ma_").replace("_ma_", "ma_")
+                        key_metrics[label] = round(val, 2)
+        except Exception:
+            pass
+
+        # 买点确认
+        buy_signal = None
+        try:
+            signals = strategy.generate_signals(df)
+            for sig in signals:
+                sig_date = sig.date.date() if hasattr(sig.date, "date") else sig.date
+                if sig_date == target_date and sig.action == "BUY":
+                    buy_signal = {
+                        "date": str(sig_date),
+                        "action": sig.action,
+                        "strength": sig.strength,
+                        "reason": sig.reason,
+                    }
+                    break
+        except Exception:
+            pass
+
+        # 因子明细
+        factor_breakdown: dict[str, float] = {}
+        try:
+            factor_breakdown = screener.explain(market_data, sym, target_date)
+        except Exception:
+            pass
+
+        item = ScreenItem(
+            symbol=sym,
+            name=name_map.get(sym, ""),
+            score=round(score, 4),
+            signal_tag=tag,
+            factor_breakdown=factor_breakdown,
+            buy_signal=buy_signal,
+            key_metrics=key_metrics,
+        )
+        results.append(item)
+
+    # ---- 6. 排序：有 buy_signal 的排前面，组内按 score 降序 ----
+    results.sort(key=lambda x: (0 if x.buy_signal else 1, -x.score))
+    with_buy = sum(1 for r in results if r.buy_signal is not None)
+
+    return ScreenResult(
+        date=str(target_date),
+        screener=screener_name,
+        strategy=strategy_name,
+        universe_size=len(market_data),
+        candidates=len(candidates),
+        with_buy_signal=with_buy,
+        results=results[:top_n],
+    )
+
+
+def _screener_index_of(df: pd.DataFrame, target: date) -> int | None:
+    """查找 target date 在 DataFrame 中的整数索引。"""
+    for i, val in enumerate(df.index):
+        d = val.date() if hasattr(val, "date") else val
+        if d == target:
+            return i
+    return None
+
+
+def _build_stock_name_map_safe() -> dict[str, str]:
+    """安全加载股票名称映射（不依赖 server 模块的缓存）。"""
+    name_map: dict[str, str] = {}
+    try:
+        csv_path = (
+            Path(__file__).resolve().parent.parent.parent
+            / "data" / "a_stock_list.csv"
+        )
+        if csv_path.exists():
+            df = pd.read_csv(csv_path)
+            if "code" in df.columns and "name" in df.columns:
+                for _, row in df.iterrows():
+                    name_map[str(row["code"])] = str(row["name"])
+    except Exception:
+        pass
+    return name_map
+
+
 # ---- 组合回测 ----
 
 def _load_portfolio_backtest_config() -> dict:

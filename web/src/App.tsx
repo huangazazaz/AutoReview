@@ -13,6 +13,7 @@ const Portfolio = lazy(() => import('@/pages/Portfolio'))
 const AIStrategy = lazy(() => import('@/pages/AIStrategy'))
 const Bars = lazy(() => import('@/pages/Bars'))
 const Groups = lazy(() => import('@/pages/Groups'))
+const Screener = lazy(() => import('@/pages/Screener'))
 
 function PageLoader() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
           <Route path="/" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+          <Route path="/screener" element={<Suspense fallback={<PageLoader />}><Screener /></Suspense>} />
           <Route path="/analyze" element={<Suspense fallback={<PageLoader />}><Analyze /></Suspense>} />
           <Route path="/backtest" element={<Suspense fallback={<PageLoader />}><Backtest /></Suspense>} />
           <Route path="/portfolio" element={<Suspense fallback={<PageLoader />}><Portfolio /></Suspense>} />

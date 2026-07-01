@@ -209,7 +209,6 @@ export default function AIStrategy() {
           onSelect={handleSelectSession}
           onNew={handleNewSession}
           onDelete={handleDeleteSession}
-          onPromptFill={handlePromptFill}
         />
 
         {/* 右侧：对话区 */}

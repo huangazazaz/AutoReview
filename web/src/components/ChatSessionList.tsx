@@ -6,19 +6,10 @@ interface ChatSessionListProps {
   onSelect: (sessionId: string) => void
   onNew: () => void
   onDelete: (sessionId: string) => void
-  onPromptFill?: (text: string) => void
 }
 
-const EXAMPLE_PROMPTS = [
-  { icon: '📊', text: '做一个5日和20日均线金叉买入、死叉卖出的策略，止损5%' },
-  { icon: '📉', text: '当RSI低于30时买入，高于70时卖出' },
-  { icon: '📈', text: '做一个MACD金叉买入、死叉卖出的策略' },
-  { icon: '🐢', text: '做一个突破20日最高价买入、跌破10日最低价卖出的海龟策略' },
-  { icon: '📐', text: '做一个布林带下轨买入、上轨卖出的策略，止损3%' },
-]
-
 export default function ChatSessionList({
-  sessions, activeSessionId, onSelect, onNew, onDelete, onPromptFill,
+  sessions, activeSessionId, onSelect, onNew, onDelete,
 }: ChatSessionListProps) {
   return (
     <div className="card card-accent" style={{
@@ -71,26 +62,6 @@ export default function ChatSessionList({
             </div>
           ))
         )}
-
-        <div style={{ marginTop: 16 }}>
-          <label className="form-label" style={{
-            marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4,
-            fontSize: 11, color: 'var(--text-muted)',
-          }}>
-            <span>💡</span> 试试这些
-          </label>
-          {EXAMPLE_PROMPTS.map((p, i) => (
-            <button key={i} className="btn btn-ghost"
-              style={{
-                width: '100%', textAlign: 'left', marginBottom: 4, fontSize: 12,
-                padding: '8px 10px', lineHeight: 1.5,
-                border: '1px solid var(--border-light)', borderRadius: 'var(--radius)',
-              }}
-              onClick={() => { onNew(); onPromptFill?.(p.text) }}>
-              <span style={{ marginRight: 6 }}>{p.icon}</span>{p.text}
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   )

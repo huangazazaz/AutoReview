@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import CreatableSelect from 'react-select/creatable'
 import { useECharts } from '@/hooks/useECharts'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
@@ -398,23 +399,33 @@ function Bars() {
                 <label className="form-label" htmlFor="bars-symbol">
                   股票代码
                 </label>
-                <input
+                <CreatableSelect
                   id="bars-symbol"
-                  className="form-input"
-                  type="text"
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value)}
-                  placeholder="例如: 000001"
-                  list="bars-stocks-list"
-                  required
+                  placeholder="输入代码或名称搜索股票…"
+                  options={cachedStocks.map(s => ({
+                    value: s.symbol,
+                    label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
+                  }))}
+                  value={symbol ? cachedStocks.find(s => s.symbol === symbol.toUpperCase())
+                    ? { value: symbol.toUpperCase(), label: `${symbol.toUpperCase()}${cachedStocks.find(s => s.symbol === symbol.toUpperCase())?.name ? ` - ${cachedStocks.find(s => s.symbol === symbol.toUpperCase())!.name}` : ''}` }
+                    : { value: symbol.toUpperCase(), label: symbol.toUpperCase() }
+                    : null}
+                  onChange={(o) => setSymbol(o?.value?.toUpperCase() || '')}
+                  onCreateOption={(input) => setSymbol(input.toUpperCase())}
+                  filterOption={(opt, input) => {
+                    const q = input.toLowerCase()
+                    return opt.data.label.toLowerCase().includes(q)
+                  }}
+                  isClearable
+                  isSearchable
+                  isLoading={cachedStocks.length === 0}
+                  loadingMessage={() => '正在加载股票列表…'}
+                  menuPortalTarget={document.body}
+                  className="react-select"
+                  classNamePrefix="rs"
+                  noOptionsMessage={() => '未找到，输入代码后按回车创建'}
+                  formatCreateLabel={(v) => `使用 "${v.toUpperCase()}"`}
                 />
-                <datalist id="bars-stocks-list">
-                  {cachedStocks.map((s) => (
-                    <option key={s.symbol} value={s.symbol}>
-                      {s.name}
-                    </option>
-                  ))}
-                </datalist>
               </div>
 
               <div className="form-group">

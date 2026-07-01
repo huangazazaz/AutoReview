@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
+import CreatableSelect from 'react-select/creatable'
 import { useApp } from '@/hooks/useApp'
 import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
 import { formatNumber, formatPct, formatAmount } from '@/utils/format'
-import type { StrategyInfo, GroupInfo, PortfolioBacktestResponse } from '@/types'
+import type { StrategyInfo, GroupInfo, PortfolioBacktestResponse, CachedStock } from '@/types'
 
 export default function Portfolio() {
   const { showToast, showLoading: showGlobalLoading, hideLoading } = useApp()
@@ -20,6 +21,7 @@ export default function Portfolio() {
 
   const [strategies, setStrategies] = useState<StrategyInfo[]>([])
   const [groups, setGroups] = useState<GroupInfo[]>([])
+  const [cachedStocks, setCachedStocks] = useState<CachedStock[]>([])
   const [result, setResult] = useState<PortfolioBacktestResponse | null>(null)
 
   const [paramSchema, setParamSchema] = useState<Record<string, { default?: unknown; type?: string }>>({})
@@ -29,6 +31,7 @@ export default function Portfolio() {
   useEffect(() => {
     api.getStrategies().then(d => setStrategies(d.strategies))
     api.getGroups().then(d => setGroups(d.groups))
+    api.getCachedStocks().then(d => setCachedStocks(d.symbols)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -143,9 +146,47 @@ export default function Portfolio() {
             {inputMode === 'symbols' ? (
               <div className="form-group" style={{ flex: 2 }}>
                 <label className="form-label" htmlFor="pf-symbols">股票代码</label>
-                <input type="text" className="form-input" id="pf-symbols"
-                  placeholder="逗号分隔，或输入 'all' 全市场"
-                  value={symbols} onChange={e => setSymbols(e.target.value)} />
+                <CreatableSelect
+                  id="pf-symbols"
+                  isMulti
+                  placeholder="输入代码或名称搜索股票，可多选…"
+                  options={cachedStocks.map(s => ({
+                    value: s.symbol,
+                    label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
+                  }))}
+                  value={symbols && symbols !== 'all'
+                    ? symbols.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).map(sym => {
+                        const found = cachedStocks.find(cs => cs.symbol === sym)
+                        return { value: sym, label: found ? `${sym} - ${found.name}` : sym }
+                      })
+                    : []}
+                  onChange={(opts) => {
+                    const vals = opts.map(o => o.value)
+                    setSymbols(vals.length ? vals.join(',') : 'all')
+                  }}
+                  onCreateOption={(input) => {
+                    const newSym = input.toUpperCase()
+                    const current = symbols === 'all' ? [] : symbols.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+                    if (!current.includes(newSym)) {
+                      current.push(newSym)
+                      setSymbols(current.join(','))
+                    }
+                  }}
+                  filterOption={(opt, input) => {
+                    const q = input.toLowerCase()
+                    return opt.data.label.toLowerCase().includes(q)
+                  }}
+                  isClearable
+                  isSearchable
+                  isLoading={cachedStocks.length === 0}
+                  loadingMessage={() => '正在加载股票列表…'}
+                  menuPortalTarget={document.body}
+                  className="react-select"
+                  classNamePrefix="rs"
+                  noOptionsMessage={() => '未找到，输入代码后按回车创建'}
+                  formatCreateLabel={(v) => `添加 "${v.toUpperCase()}"`}
+                />
+                <div className="form-hint">直接输入代码可添加任意股票，留空则使用全市场</div>
               </div>
             ) : (
               <div className="form-group" style={{ flex: 2 }}>

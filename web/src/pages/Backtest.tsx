@@ -63,7 +63,6 @@ const Backtest = () => {
   /* ---- form state ------------------------------------------------ */
   const [activeTab, setActiveTab] = useState<'symbols' | 'group'>('symbols')
   const [symbols, setSymbols] = useState('')
-  const [selectedCachedStock, setSelectedCachedStock] = useState('')
   const [selectedGroup, setSelectedGroup] = useState('')
   const [selectedStrategy, setSelectedStrategy] = useState('')
   const [selectedPeriod, setSelectedPeriod] = useState('')
@@ -130,27 +129,6 @@ const Backtest = () => {
         .filter(Boolean),
     [symbols],
   )
-
-  const handleAddCachedStock = useCallback(() => {
-    if (!selectedCachedStock) return
-    if (!symbolsArray.includes(selectedCachedStock)) {
-      setSymbols((prev) => {
-        const arr = prev
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean)
-        arr.push(selectedCachedStock)
-        return arr.join(', ')
-      })
-    }
-    setSelectedCachedStock('')
-  }, [selectedCachedStock, symbolsArray])
-
-  const handleAddAllCached = useCallback(() => {
-    const cachedSymbols = cachedStocks.map((s) => s.symbol).filter(Boolean)
-    const merged = Array.from(new Set([...symbolsArray, ...cachedSymbols]))
-    setSymbols(merged.join(', '))
-  }, [cachedStocks, symbolsArray])
 
   /* ================================================================ */
   /*  Find selected strategy object (for StrategyParamsEditor)        */
@@ -527,64 +505,6 @@ const Backtest = () => {
                       noOptionsMessage={() => '未找到，输入代码后按回车添加'}
                       formatCreateLabel={(v) => `添加 "${v.toUpperCase()}"`}
                     />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label
-                      className="form-label"
-                      htmlFor="cached-stocks-select"
-                    >
-                      缓存股票
-                    </label>
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '8px',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Select
-                        id="cached-stocks-select"
-                        placeholder="搜索并选择股票…"
-                        options={cachedStocks.map(s => ({
-                          value: s.symbol,
-                          label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
-                        }))}
-                        value={selectedCachedStock ? {
-                          value: selectedCachedStock,
-                          label: cachedStocks.find(s => s.symbol === selectedCachedStock)?.symbol || selectedCachedStock
-                        } : null}
-                        onChange={(o) => setSelectedCachedStock(o?.value || '')}
-                        isSearchable
-                        isClearable
-                        isLoading={cachedStocks.length === 0}
-                        loadingMessage={() => '正在加载…'}
-                        menuPortalTarget={document.body}
-                        className="react-select"
-                        classNamePrefix="rs"
-                        styles={{ container: (b) => ({ ...b, flex: 1 }) }}
-                      />
-
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={handleAddCachedStock}
-                        disabled={!selectedCachedStock}
-                      >
-                        添加
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={handleAddAllCached}
-                        disabled={cachedStocks.length === 0}
-                      >
-                        全部添加
-                      </button>
-                    </div>
                   </div>
                 </div>
               </>

@@ -18,7 +18,6 @@ export default function AIStrategy() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [sending, setSending] = useState(false)
   const [nextId, setNextId] = useState(1)
-  const [codeExpanded, setCodeExpanded] = useState<Record<number, boolean>>({})
   const [exampleFillText, setExampleFillText] = useState('')
 
   // Load active session on mount
@@ -51,7 +50,6 @@ export default function AIStrategy() {
         codeExpanded: false,
       })))
       setNextId(data.messages.length + 1)
-      setCodeExpanded({})
       // Add to sessions list if not present
       setSessions(prev => {
         if (prev.find(s => s.session_id === sessionId)) return prev
@@ -135,7 +133,6 @@ export default function AIStrategy() {
     setActiveSessionId(undefined)
     setMessages([])
     setNextId(1)
-    setCodeExpanded({})
     localStorage.removeItem('ai_chat_active_session')
   }, [])
 
@@ -189,7 +186,9 @@ export default function AIStrategy() {
   }, [])
 
   const handleCodeExpand = useCallback((messageId: number) => {
-    setCodeExpanded(prev => ({ ...prev, [messageId]: !prev[messageId] }))
+    setMessages(prev => prev.map(m =>
+      m.id === messageId ? { ...m, codeExpanded: !m.codeExpanded } : m
+    ))
   }, [])
 
   const handleCopy = useCallback(async (code: string) => {

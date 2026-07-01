@@ -42,6 +42,8 @@ except ImportError:
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 from pydantic import BaseModel
 
 from autotrade.core.engine import analyze_stock, run_backtest, run_portfolio_backtest
@@ -87,6 +89,46 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---- SPA fallback 中间件 ----
+# 浏览器直接访问 /groups、/strategies 等路径时，Accept 头包含 text/html。
+# FastAPI 会优先匹配到同名 API 路由返回 JSON，导致页面渲染失败。
+# 此中间件在 API 路由之前拦截浏览器请求，返回 index.html。
+
+_SPA_ROUTES = {
+    "/", "/login", "/register", "/dashboard",
+    "/analyze", "/backtest", "/portfolio", "/ai-strategy",
+    "/bars", "/groups",
+}
+
+# Resolve the SPA index.html path once at import time
+_SPA_INDEX = Path(__file__).resolve().parent.parent.parent / "web" / "dist" / "index.html"
+
+
+class SPAFallbackMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Only intercept GET requests from browsers (Accept: text/html)
+        if request.method == "GET" and _SPA_INDEX.exists():
+            accept = request.headers.get("accept", "")
+            if "text/html" in accept:
+                path = request.url.path
+                # Serve index.html for known SPA routes or paths that look like
+                # page navigations (no file extension, not an API-only path)
+                is_spa = path in _SPA_ROUTES or (
+                    "/" in path
+                    and "." not in path.rsplit("/", 1)[-1]
+                    and not path.startswith("/assets/")
+                    and not path.startswith("/auth/")
+                    and not path.startswith("/ai/")
+                    and not path.startswith("/cache/")
+                    and path not in ("/health", "/strategies", "/datasources")
+                )
+                if is_spa:
+                    from fastapi.responses import FileResponse
+                    return FileResponse(_SPA_INDEX)
+        return await call_next(request)
+
+app.add_middleware(SPAFallbackMiddleware)
 
 # ---- 认证路由 ----
 app.include_router(auth_router)

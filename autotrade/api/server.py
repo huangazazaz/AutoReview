@@ -275,10 +275,25 @@ def api_portfolio_backtest(req: PortfolioBacktestRequest):
         return {"error": result["error"]}
 
     metrics = result.get("metrics", {})
+    # Serialize trade records
+    trades_list = []
+    for t in result.get("trades", []):
+        trades_list.append({
+            "symbol": t.symbol,
+            "buy_date": str(t.buy_date),
+            "sell_date": str(t.sell_date),
+            "buy_price": t.buy_price,
+            "sell_price": t.sell_price,
+            "quantity": t.quantity,
+            "pnl": t.pnl,
+            "pnl_pct": t.pnl_pct,
+            "trigger": t.trigger,
+        })
     return {
         "metrics": metrics,
         "trade_count": result.get("trade_count", 0),
         "output_dir": result.get("output_dir", ""),
+        "trades": trades_list,
     }
 
 

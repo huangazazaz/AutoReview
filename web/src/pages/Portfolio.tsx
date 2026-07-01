@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
 import { formatNumber, formatPct, formatAmount } from '@/utils/format'
 import { MAX_DATE } from '@/utils/date'
-import type { PortfolioBacktestResponse } from '@/types'
+import type { PortfolioBacktestResponse, PortfolioTrade } from '@/types'
 
 export default function Portfolio() {
   const { showToast, showLoading: showGlobalLoading, hideLoading } = useApp()
@@ -290,6 +290,9 @@ export default function Portfolio() {
   )
 }
 
+const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '2px solid var(--border)', fontWeight: 600, whiteSpace: 'nowrap' }
+const tdStyle: React.CSSProperties = { padding: '6px 12px' }
+
 function PortfolioResult({ result, screener, strategy }: {
   result: PortfolioBacktestResponse
   screener: string
@@ -379,6 +382,64 @@ function PortfolioResult({ result, screener, strategy }: {
           </div>
         </div>
       </div>
+
+      {result.trades && result.trades.length > 0 && (
+        <div className="card card-accent" style={{ marginTop: 16 }}>
+          <div className="card-header">
+            <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>📋</span> 交易记录
+              <span className="badge" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                {result.trades.length} 笔
+              </span>
+            </span>
+          </div>
+          <div className="card-body" style={{ padding: 0 }}>
+            <div className="table-container" style={{ maxHeight: 400, overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-card-hover)', position: 'sticky', top: 0, zIndex: 1 }}>
+                    <th style={thStyle}>股票</th>
+                    <th style={thStyle}>买入日</th>
+                    <th style={thStyle}>买入价</th>
+                    <th style={thStyle}>卖出日</th>
+                    <th style={thStyle}>卖出价</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>数量</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>盈亏</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>收益率</th>
+                    <th style={thStyle}>触发</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.trades.map((t, i) => {
+                    const isWin = t.pnl >= 0
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        <td style={tdStyle}>{t.symbol}</td>
+                        <td style={tdStyle}>{t.buy_date}</td>
+                        <td style={tdStyle}>{formatNumber(t.buy_price, 2)}</td>
+                        <td style={tdStyle}>{t.sell_date}</td>
+                        <td style={tdStyle}>{formatNumber(t.sell_price, 2)}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>{t.quantity}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', color: isWin ? 'var(--buy)' : 'var(--sell)', fontFamily: 'var(--font-mono)' }}>
+                          {isWin ? '+' : ''}{formatNumber(t.pnl, 2)}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right', color: isWin ? 'var(--buy)' : 'var(--sell)', fontFamily: 'var(--font-mono)' }}>
+                          {isWin ? '+' : ''}{formatPct(t.pnl_pct)}
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{ fontSize: 11, background: 'var(--bg-input)', padding: '2px 6px', borderRadius: 4 }}>
+                            {t.trigger || '—'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {result.output_dir && (
         <div className="card card-gradient" style={{ marginTop: 8 }}>

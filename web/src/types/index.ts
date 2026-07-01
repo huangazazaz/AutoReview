@@ -156,7 +156,20 @@ export interface PortfolioBacktestResponse {
   metrics?: PortfolioBacktestMetrics
   trade_count: number
   output_dir: string
+  trades?: PortfolioTrade[]
   error?: string
+}
+
+export interface PortfolioTrade {
+  symbol: string
+  buy_date: string
+  sell_date: string
+  buy_price: number
+  sell_price: number
+  quantity: number
+  pnl: number
+  pnl_pct: number
+  trigger: string
 }
 
 // ---- AI 策略生成 ----

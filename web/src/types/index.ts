@@ -286,3 +286,58 @@ export interface RegisterRequest {
   username: string
   password: string
 }
+
+// ---- 选股 / Screener ----
+
+export interface ScreenerInfo {
+  name: string
+  params: Record<string, unknown>
+  param_schema: Record<string, ParamSchemaEntry>
+}
+
+export interface ScreenRequest {
+  screener: string
+  strategy: string
+  date: string
+  top_n?: number
+  screener_params?: Record<string, unknown>
+  strategy_params?: Record<string, unknown>
+}
+
+export interface FactorBreakdown {
+  [factorName: string]: number
+}
+
+export interface BuySignalInfo {
+  date: string
+  action: 'BUY'
+  strength: number
+  reason: string
+}
+
+export interface KeyMetrics {
+  close: number
+  volume: number
+  amount: number
+  [indicator: string]: number
+}
+
+export interface ScreenItem {
+  symbol: string
+  name: string
+  score: number
+  signal_tag: string
+  factor_breakdown: FactorBreakdown
+  buy_signal: BuySignalInfo | null
+  key_metrics: KeyMetrics
+}
+
+export interface ScreenResult {
+  date: string
+  screener: string
+  strategy: string
+  universe_size: number
+  candidates: number
+  with_buy_signal: number
+  results: ScreenItem[]
+}

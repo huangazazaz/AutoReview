@@ -96,3 +96,27 @@ class BacktestResult:
     def __post_init__(self):
         if self.metrics is None:
             self.metrics = {}
+
+
+@dataclass
+class ScreenItem:
+    """单只股票的选股结果。"""
+    symbol: str
+    name: str = ""
+    score: float = 0.0
+    signal_tag: str = ""
+    factor_breakdown: dict = field(default_factory=dict)        # {因子名: 得分}
+    buy_signal: Optional[dict] = None                            # {"date": str, "action": str, "strength": float, "reason": str}
+    key_metrics: dict = field(default_factory=dict)              # {"close": ..., "volume": ..., ...}
+
+
+@dataclass
+class ScreenResult:
+    """选股扫描完整结果。"""
+    date: str = ""
+    screener: str = ""
+    strategy: str = ""
+    universe_size: int = 0
+    candidates: int = 0
+    with_buy_signal: int = 0
+    results: list[ScreenItem] = field(default_factory=list)

@@ -280,12 +280,12 @@ export default function Analyze() {
   const defaultSet = useRef(false)
   useEffect(() => {
     if (defaultSet.current || strategies.length === 0) return
+    // Only act when there's no valid strategy selected yet
     if (!strategyName || !strategies.find(s => s.name === strategyName)) {
-      // Prefer built-in ma_cross as default, else first available
       const def = strategies.find(s => s.name === 'ma_cross') ?? strategies[0]
       if (def) {
         setStrategyName(def.name)
-        // Populate default params from schema
+        defaultSet.current = true
         if (def.param_schema) {
           const initial: Record<string, string> = {}
           for (const [key, entry] of Object.entries(def.param_schema)) {
@@ -297,7 +297,6 @@ export default function Analyze() {
         }
       }
     }
-    defaultSet.current = true
   }, [strategies, strategyName])
 
   /* ── Populate dates on period change ───────────────────────────────────── */

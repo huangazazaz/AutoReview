@@ -128,7 +128,7 @@ export default function Dashboard() {
       <PageHero>
         <PageHeader
           title="仪表盘"
-          subtitle="AutoTrade A股量化回测系统 · 实时状态概览"
+          subtitle="BacktestLab A股量化回测系统 · 实时状态概览"
         />
       </PageHero>
 

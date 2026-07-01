@@ -78,7 +78,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             <circle cx="18" cy="11" r="1" fill="currentColor" fillOpacity="0.5"/>
           </svg>
         </span>
-        <span className="brand-text">AutoTrade</span>
+        <span className="brand-text">BacktestLab</span>
       </div>
 
       {/* 导航区域 */}

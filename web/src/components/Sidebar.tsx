@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
 
 interface SidebarProps {
   mobileOpen?: boolean
@@ -60,6 +61,7 @@ const svgIcons: Record<string, JSX.Element> = {
 }
 
 export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
+  const { user, logout } = useAuth()
   const sidebarClass = 'sidebar' + (mobileOpen ? ' open' : '')
 
   return (
@@ -102,6 +104,27 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
         borderTop: '1px solid transparent',
         borderImage: 'linear-gradient(90deg, transparent 0%, var(--border-light) 20%, var(--border-light) 80%, transparent 100%) 1',
       }}>
+        {user && (
+          <div className="sidebar-user">
+            <span className="sidebar-user__avatar">
+              {user.username.charAt(0).toUpperCase()}
+            </span>
+            <span className="sidebar-user__name" title={user.username}>
+              {user.username}
+            </span>
+            <button
+              className="sidebar-user__logout"
+              onClick={logout}
+              title="退出登录"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          </div>
+        )}
         <span className="version">
           <span className="version-text">v0.1.0</span>
           <span style={{ margin: '0 6px', color: 'var(--border)' }}>·</span>

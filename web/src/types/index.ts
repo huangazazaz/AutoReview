@@ -249,3 +249,25 @@ export interface ChatHistoryResponse {
   session: ChatSession
   messages: ChatMessage[]
 }
+
+// ---- 用户认证 ----
+export interface UserInfo {
+  id: string
+  username: string
+  created_at: string
+}
+
+export interface AuthResponse {
+  token: string
+  user: UserInfo
+}
+
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface RegisterRequest {
+  username: string
+  password: string
+}

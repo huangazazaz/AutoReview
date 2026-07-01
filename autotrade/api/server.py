@@ -49,6 +49,7 @@ from autotrade.registry import (
     init_registry, list_datasources, list_strategies,
 )
 from autotrade.ai.session_store import SessionStore, ChatMessage as StoreChatMessage
+from autotrade.auth.routes import router as auth_router
 
 # Session store singleton
 _session_store = SessionStore(ttl_seconds=7200)
@@ -85,6 +86,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---- 认证路由 ----
+app.include_router(auth_router)
 
 logger = logging.getLogger(__name__)
 

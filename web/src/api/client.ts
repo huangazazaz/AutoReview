@@ -15,14 +15,44 @@ import type {
   ChatRequest,
   ChatResponse,
   ChatHistoryResponse,
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  UserInfo,
 } from '@/types'
 
 const BASE = ''
 
+function getToken(): string | null {
+  return localStorage.getItem('auth_token')
+}
+
+export function setToken(token: string | null) {
+  if (token) {
+    localStorage.setItem('auth_token', token)
+  } else {
+    localStorage.removeItem('auth_token')
+  }
+}
+
+// Called when a 401 is received — clears auth state and redirects to login
+let onAuthExpired: (() => void) | null = null
+export function setOnAuthExpired(fn: (() => void) | null) {
+  onAuthExpired = fn
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+  // Attach auth token if available
+  const token = getToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const opts: RequestInit = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers,
   }
   if (body !== undefined) {
     opts.body = JSON.stringify(body)
@@ -33,6 +63,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     res = await fetch(BASE + path, opts)
   } catch (err) {
     throw new Error(`网络错误：无法连接到服务器 (${(err as Error).message})`)
+  }
+
+  // Handle 401 — token expired or invalid
+  if (res.status === 401) {
+    setToken(null)
+    if (onAuthExpired) onAuthExpired()
+    throw new Error('登录已过期，请重新登录')
   }
 
   const data = await res.json()
@@ -151,4 +188,11 @@ export const api = {
 
   deleteChat: (sessionId: string) =>
     del<{ ok: boolean }>('/ai/chat/' + encodeURIComponent(sessionId)),
+
+  // ---- 认证 ----
+  login: (params: LoginRequest) => post<AuthResponse>('/auth/login', params),
+
+  register: (params: RegisterRequest) => post<AuthResponse>('/auth/register', params),
+
+  me: () => get<UserInfo>('/auth/me'),
 }

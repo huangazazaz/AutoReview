@@ -68,14 +68,32 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new Error(`网络错误：无法连接到服务器 (${(err as Error).message})`)
   }
 
-  // Handle 401 — token expired or invalid
+  // Handle 401
   if (res.status === 401) {
+    // Try to read backend's error detail
+    let serverMsg = ''
+    try {
+      const errData = await res.json()
+      serverMsg = errData.detail || ''
+    } catch { /* ignore parse failure */ }
+
+    // For login/register, 401 means bad credentials — preserve backend message
+    if (path === '/auth/login' || path === '/auth/register') {
+      throw new Error(serverMsg || '用户名或密码错误')
+    }
+
+    // For all other endpoints, 401 means token expired/invalid
     setToken(null)
     if (onAuthExpired) onAuthExpired()
-    throw new Error('登录已过期，请重新登录')
+    throw new Error(serverMsg || '登录已过期，请重新登录')
   }
 
-  const data = await res.json()
+  let data: any
+  try {
+    data = await res.json()
+  } catch {
+    throw new Error(`请求失败 (HTTP ${res.status})`)
+  }
 
   if (!res.ok) {
     if (res.status === 422 && data.detail) {

@@ -7,7 +7,7 @@ import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState, TrendIndicator } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
-import { MAX_DATE } from '@/utils/date'
+import { MAX_DATE, filterStockOption } from '@/utils/date'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 import type { AnalyzeResult, Bar, Trade } from '@/types'
@@ -273,6 +273,12 @@ export default function Analyze() {
     return groups
   }, [strategies])
 
+  const stockOptions = useMemo(() =>
+    cachedStocks.map(s => ({
+      value: s.symbol,
+      label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`,
+    })), [cachedStocks])
+
   /* ── Load lookups on mount ─────────────────────────────────────────────── */
   useEffect(() => {
     if (initialLoadDone.current) return
@@ -452,10 +458,8 @@ export default function Analyze() {
               <CreatableSelect
                 id="analyze-symbol"
                 placeholder="输入代码或名称搜索股票…"
-                options={cachedStocks.map(s => ({
-                  value: s.symbol,
-                  label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
-                }))}
+                options={stockOptions}
+                filterOption={filterStockOption}
                 value={symbol ? cachedStocks.find(s => s.symbol === symbol.toUpperCase())
                   ? { value: symbol.toUpperCase(), label: `${symbol.toUpperCase()}${cachedStocks.find(s => s.symbol === symbol.toUpperCase())?.name ? ` - ${cachedStocks.find(s => s.symbol === symbol.toUpperCase())!.name}` : ''}` }
                   : { value: symbol.toUpperCase(), label: symbol.toUpperCase() }

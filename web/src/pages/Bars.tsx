@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import CreatableSelect from 'react-select/creatable'
 import { useECharts } from '@/hooks/useECharts'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
-import { MAX_DATE } from '@/utils/date'
+import { MAX_DATE, filterStockOption } from '@/utils/date'
 import type { BarsResponse, Bar } from '@/types'
 import type { EChartsOption } from 'echarts'
 
@@ -125,6 +125,12 @@ function Bars() {
   // UI state
   const { stocks: cachedStocks } = useCachedStocks()
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
+
+  const stockOptions = useMemo(() =>
+    cachedStocks.map(s => ({
+      value: s.symbol,
+      label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`,
+    })), [cachedStocks])
   const [chartSummary, setChartSummary] = useState('')
 
   // ── Keep selectedIdxRef in sync ────────────────────────────────────
@@ -384,10 +390,8 @@ function Bars() {
                 <CreatableSelect
                   id="bars-symbol"
                   placeholder="输入代码或名称搜索股票…"
-                  options={cachedStocks.map(s => ({
-                    value: s.symbol,
-                    label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
-                  }))}
+                  options={stockOptions}
+                  filterOption={filterStockOption}
                   value={symbol ? cachedStocks.find(s => s.symbol === symbol.toUpperCase())
                     ? { value: symbol.toUpperCase(), label: `${symbol.toUpperCase()}${cachedStocks.find(s => s.symbol === symbol.toUpperCase())?.name ? ` - ${cachedStocks.find(s => s.symbol === symbol.toUpperCase())!.name}` : ''}` }
                     : { value: symbol.toUpperCase(), label: symbol.toUpperCase() }

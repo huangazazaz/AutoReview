@@ -9,7 +9,7 @@ import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
 import { formatNumber, formatPct, formatAmount } from '@/utils/format'
-import { MAX_DATE } from '@/utils/date'
+import { MAX_DATE, filterStockOption } from '@/utils/date'
 import type { PortfolioBacktestResponse, PortfolioTrade } from '@/types'
 
 export default function Portfolio() {
@@ -27,6 +27,12 @@ export default function Portfolio() {
   const { strategies } = useCachedStrategies()
   const { groups } = useCachedGroups()
   const { stocks: cachedStocks } = useCachedStocks()
+
+  const stockOptions = useMemo(() =>
+    cachedStocks.map(s => ({
+      value: s.symbol,
+      label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`,
+    })), [cachedStocks])
   const [result, setResult] = useState<PortfolioBacktestResponse | null>(null)
 
   const [paramSchema, setParamSchema] = useState<Record<string, { default?: unknown; type?: string }>>({})
@@ -177,10 +183,8 @@ export default function Portfolio() {
                   id="pf-symbols"
                   isMulti
                   placeholder="输入代码或名称搜索股票，可多选…"
-                  options={cachedStocks.map(s => ({
-                    value: s.symbol,
-                    label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
-                  }))}
+                  options={stockOptions}
+                  filterOption={filterStockOption}
                   value={symbols
                     ? symbols.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).map(sym => {
                         const found = cachedStocks.find(cs => cs.symbol === sym)

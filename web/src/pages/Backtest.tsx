@@ -9,7 +9,7 @@ import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, escapeHtml } from '@/utils/format'
-import { MAX_DATE } from '@/utils/date'
+import { MAX_DATE, filterStockOption } from '@/utils/date'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 import type { StrategyInfo, BacktestSummary, BacktestResultItem } from '@/types'
@@ -116,6 +116,12 @@ const Backtest = () => {
     if (usr.length) groups.push({ label: '用户策略', options: usr.map(s => ({ value: s.name, label: s.name })) })
     return groups
   }, [strategies])
+
+  const stockOptions = useMemo(() =>
+    cachedStocks.map(s => ({
+      value: s.symbol,
+      label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`,
+    })), [cachedStocks])
 
   /* ================================================================ */
   /*  Data loading on mount                                           */
@@ -508,10 +514,8 @@ const Backtest = () => {
                       id="symbols-input"
                       isMulti
                       placeholder="输入代码或名称搜索股票，支持多选…"
-                      options={cachedStocks.map(s => ({
-                        value: s.symbol,
-                        label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
-                      }))}
+                      options={stockOptions}
+                      filterOption={filterStockOption}
                       value={symbolsArray.map(code => {
                         const s = cachedStocks.find(c => c.symbol === code)
                         return s

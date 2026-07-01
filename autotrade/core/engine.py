@@ -777,4 +777,6 @@ def run_portfolio_backtest(
         "metrics": result.metrics,
         "trade_count": len(result.trades),
         "output_dir": str(run_dir),
+        "equity_curve": result.equity_curve,
+        "trades": result.trades,
     }

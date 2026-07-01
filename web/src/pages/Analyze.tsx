@@ -2,13 +2,14 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useApp } from '@/hooks/useApp'
 import { useECharts } from '@/hooks/useECharts'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
+import { useCachedStrategies } from '@/hooks/useCachedStrategies'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState, TrendIndicator } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
-import type { AnalyzeResult, StrategyInfo, Bar, Trade } from '@/types'
+import type { AnalyzeResult, Bar, Trade } from '@/types'
 import * as echarts from 'echarts'
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -237,7 +238,7 @@ export default function Analyze() {
   const [strategyParams, setStrategyParams] = useState<Record<string, string>>({})
 
   /* ── Reference / lookup data ───────────────────────────────────────────── */
-  const [strategies, setStrategies] = useState<StrategyInfo[]>([])
+  const { strategies } = useCachedStrategies()
   const [datasources, setDatasources] = useState<string[]>([])
   const { stocks: cachedStocks } = useCachedStocks()
 
@@ -269,14 +270,35 @@ export default function Analyze() {
     if (initialLoadDone.current) return
     initialLoadDone.current = true
 
-    Promise.all([
-      api.getStrategies().then((r) => r.strategies).catch(() => [] as StrategyInfo[]),
-      api.getDatasources().then((r) => r.datasources).catch(() => [] as string[]),
-    ]).then(([strats, dss]) => {
-      setStrategies(strats)
-      setDatasources(dss)
-    })
+    api.getDatasources()
+      .then((r) => r.datasources)
+      .catch(() => [] as string[])
+      .then((dss) => setDatasources(dss))
   }, [])
+
+  // Set default strategy when strategies first become available
+  const defaultSet = useRef(false)
+  useEffect(() => {
+    if (defaultSet.current || strategies.length === 0) return
+    if (!strategyName || !strategies.find(s => s.name === strategyName)) {
+      // Prefer built-in ma_cross as default, else first available
+      const def = strategies.find(s => s.name === 'ma_cross') ?? strategies[0]
+      if (def) {
+        setStrategyName(def.name)
+        // Populate default params from schema
+        if (def.param_schema) {
+          const initial: Record<string, string> = {}
+          for (const [key, entry] of Object.entries(def.param_schema)) {
+            if (entry.default !== undefined) {
+              initial[key] = String(entry.default)
+            }
+          }
+          setStrategyParams(initial)
+        }
+      }
+    }
+    defaultSet.current = true
+  }, [strategies, strategyName])
 
   /* ── Populate dates on period change ───────────────────────────────────── */
   const handlePeriodChange = useCallback((value: string) => {

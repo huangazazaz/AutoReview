@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '@/hooks/useApp'
 import { useECharts } from '@/hooks/useECharts'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
+import { useCachedStrategies } from '@/hooks/useCachedStrategies'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
@@ -90,7 +91,7 @@ const Backtest = () => {
   const [showParamsEditor, setShowParamsEditor] = useState(false)
 
   /* ---- loaded data ----------------------------------------------- */
-  const [strategies, setStrategies] = useState<StrategyInfo[]>([])
+  const { strategies } = useCachedStrategies()
   const [datasources, setDatasources] = useState<string[]>([])
   const [groups, setGroups] = useState<GroupInfo[]>([])
   const { stocks: cachedStocks } = useCachedStocks()
@@ -124,13 +125,11 @@ const Backtest = () => {
 
     const load = async () => {
       try {
-        const [stratRes, dsRes, grpRes] = await Promise.all([
-          api.getStrategies(),
+        const [dsRes, grpRes] = await Promise.all([
           api.getDatasources(),
           api.getGroups(),
         ])
         if (cancelled) return
-        setStrategies(stratRes.strategies ?? [])
         setDatasources(dsRes.datasources ?? [])
         setGroups(grpRes.groups ?? [])
       } catch (err) {

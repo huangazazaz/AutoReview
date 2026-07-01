@@ -57,17 +57,40 @@ class UserStore:
             self._write({})
 
     def _read(self) -> dict[str, dict]:
-        """Read all users from disk. Caller must hold lock."""
+        """Read all users from disk. Caller must hold lock.
+
+        On FileNotFoundError (first run): returns empty dict.
+        On JSONDecodeError (corrupted file): backs up the corrupted file,
+        logs a warning, and returns empty dict.
+        """
         try:
             with open(self._filepath, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
+        except FileNotFoundError:
+            return {}
+        except json.JSONDecodeError:
+            # Back up the corrupted file so data can be recovered
+            import logging
+            import shutil
+            _logger = logging.getLogger("autotrade.auth.store")
+            backup = self._filepath.with_suffix(".json.bak")
+            try:
+                shutil.copy2(self._filepath, backup)
+                _logger.warning(
+                    "用户数据文件损坏，已备份至 %s。将使用空用户表。",
+                    backup,
+                )
+            except Exception:
+                _logger.exception("无法备份损坏的用户数据文件")
             return {}
 
     def _write(self, data: dict[str, dict]) -> None:
-        """Write all users to disk. Caller must hold lock."""
-        with open(self._filepath, "w", encoding="utf-8") as f:
+        """Write all users to disk atomically. Caller must hold lock."""
+        import os
+        tmp = self._filepath.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, self._filepath)  # atomic on POSIX and Windows
 
     def get_by_username(self, username: str) -> Optional[UserRecord]:
         """Find a user by username (case-insensitive)."""

@@ -48,10 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(u)
         setTokenState(storedToken)
       })
-      .catch(() => {
-        // Token invalid — clear it
-        setToken(null)
-        setTokenState(null)
+      .catch((err: unknown) => {
+        // Only clear token if the error was a genuine 401 (token expired/invalid).
+        // Network errors or server 5xx should not log the user out.
+        const msg = err instanceof Error ? err.message : ''
+        if (msg.includes('登录已过期') || msg.includes('Token')) {
+          setToken(null)
+          setTokenState(null)
+        }
+        // Otherwise: user stays "logged in" but token verification failed temporarily.
+        // The next API call that needs auth will trigger the 401 handler if needed.
       })
       .finally(() => {
         setIsVerifying(false)

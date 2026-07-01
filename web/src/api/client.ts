@@ -77,9 +77,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       serverMsg = errData.detail || ''
     } catch { /* ignore parse failure */ }
 
-    // For login/register, 401 means bad credentials — preserve backend message
-    if (path === '/auth/login' || path === '/auth/register') {
-      throw new Error(serverMsg || '用户名或密码错误')
+    // For login/register/me, 401 means bad credentials or expired session
+    // — let the caller handle it, don't trigger global logout redirect
+    if (path === '/auth/login' || path === '/auth/register' || path === '/auth/me') {
+      throw new Error(serverMsg || '认证失败')
     }
 
     // For all other endpoints, 401 means token expired/invalid

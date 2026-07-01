@@ -212,7 +212,6 @@ export default function Portfolio() {
                     inputValue ? '未找到，输入代码后按回车创建' : '输入代码或名称开始搜索'}
                   formatCreateLabel={(v) => `添加 "${v.toUpperCase()}"`}
                 />
-                <div className="form-hint">直接输入代码可添加任意股票，留空则使用全市场</div>
               </div>
             ) : (
               <div className="form-group" style={{ flex: 2 }}>

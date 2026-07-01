@@ -1912,3 +1912,18 @@ code {
   color: var(--danger);
   background: rgba(239, 68, 68, 0.1);
 }
+
+/* =====================================================
+   系统内置标签
+   ===================================================== */
+.badge-system {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  border-radius: var(--radius-sm);
+  background: rgba(139, 92, 246, 0.15);
+  color: #8B5CF6;
+  vertical-align: middle;
+}

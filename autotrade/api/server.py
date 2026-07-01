@@ -47,6 +47,7 @@ from pydantic import BaseModel
 from autotrade.core.engine import analyze_stock, run_backtest, run_portfolio_backtest
 from autotrade.registry import (
     init_registry, list_datasources, list_strategies,
+    is_builtin_strategy, is_builtin_group,
 )
 from autotrade.ai.session_store import SessionStore, ChatMessage as StoreChatMessage
 from autotrade.auth.routes import router as auth_router
@@ -602,7 +603,7 @@ def api_save_strategy(req: SaveStrategyRequest):
     from autotrade.ai.strategy_generator import StrategyGenerator
     from autotrade.registry import init_registry as reload_registry
 
-    if StrategyGenerator.is_builtin(req.name):
+    if is_builtin_strategy(req.name):
         return {"error": f"不能覆盖内置策略: {req.name}"}
 
     py_path = Path(__file__).resolve().parent.parent / "strategies" / f"{req.name}.py"
@@ -635,7 +636,7 @@ def api_delete_strategy(name: str):
     from autotrade.ai.strategy_generator import StrategyGenerator
     from autotrade.registry import init_registry as reload_registry
 
-    if StrategyGenerator.is_builtin(name):
+    if is_builtin_strategy(name):
         return {"error": f"不能删除内置策略: {name}"}
 
     py_path = Path(__file__).resolve().parent.parent / "strategies" / f"{name}.py"
@@ -664,7 +665,7 @@ def api_list_strategies():
 
     result = []
     for name in list_strategies():
-        info: dict = {"name": name, "params": {}}
+        info: dict = {"name": name, "params": {}, "is_builtin": is_builtin_strategy(name)}
         # 加载 YAML 配置的当前参数值
         yaml_cfg = get_strategy_params(name)
         if yaml_cfg and "params" in yaml_cfg:
@@ -760,6 +761,7 @@ def api_list_groups():
                 "id": f.stem,
                 "name": cfg.get("name", f.stem),
                 "symbols": [{"code": c, "name": n} for c, n in syms],
+                "is_builtin": is_builtin_group(f.stem),
             })
     return {"groups": result}
 
@@ -803,6 +805,7 @@ def _read_group(group_id: str) -> dict | None:
         "id": group_id,
         "name": cfg.get("name", group_id),
         "symbols": [{"code": c, "name": n} for c, n in syms],
+        "is_builtin": is_builtin_group(group_id),
     }
 
 
@@ -840,6 +843,8 @@ def api_create_group(req: GroupCreate):
 @app.put("/groups/{group_id}")
 def api_update_group(group_id: str, req: GroupUpdate):
     """更新股票分组。"""
+    if is_builtin_group(group_id):
+        return {"error": "系统内置分组不可修改"}
     g = _read_group(group_id)
     if g is None:
         return {"error": f"分组不存在: {group_id}"}
@@ -852,6 +857,8 @@ def api_update_group(group_id: str, req: GroupUpdate):
 @app.delete("/groups/{group_id}")
 def api_delete_group(group_id: str):
     """删除股票分组。"""
+    if is_builtin_group(group_id):
+        return {"error": "系统内置分组不可删除"}
     path = _group_path(group_id)
     if not path.exists():
         return {"error": f"分组不存在: {group_id}"}

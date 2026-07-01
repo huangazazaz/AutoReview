@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import CreatableSelect from 'react-select/creatable'
 import { useApp } from '@/hooks/useApp'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
@@ -28,6 +28,12 @@ export default function Portfolio() {
   const [paramSchema, setParamSchema] = useState<Record<string, { default?: unknown; type?: string }>>({})
   const [editParams, setEditParams] = useState<Record<string, string>>({})
   const [paramsExpanded, setParamsExpanded] = useState(false)
+
+  const strategyGroups = useMemo(() => {
+    const sys = strategies.filter(s => s.is_builtin)
+    const usr = strategies.filter(s => !s.is_builtin)
+    return { sys, usr }
+  }, [strategies])
 
   useEffect(() => {
     api.getStrategies().then(d => setStrategies(d.strategies))
@@ -146,7 +152,16 @@ export default function Portfolio() {
               </label>
               <select className="form-select" id="pf-strategy" value={strategy} onChange={e => setStrategy(e.target.value)}>
                 <option value="">— 纯 Screener 模式 —</option>
-                {strategies.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                {strategyGroups.sys.length > 0 && (
+                  <optgroup label="系统策略">
+                    {strategyGroups.sys.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                  </optgroup>
+                )}
+                {strategyGroups.usr.length > 0 && (
+                  <optgroup label="用户策略">
+                    {strategyGroups.usr.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+                  </optgroup>
+                )}
               </select>
             </div>
           </div>

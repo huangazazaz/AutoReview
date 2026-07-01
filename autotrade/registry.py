@@ -26,6 +26,25 @@ _screens: dict[str, type[Screener]] = {}
 # 初始化标志
 _initialized = False
 
+# ── 内置策略（系统自带，不可删除/覆盖）──────────────────────────────
+_BUILTIN_STRATEGIES: set[str] = {
+    "turtle", "ma_cross", "ma_cross_macd", "hot_money",
+    "golden_filter", "trend_ma_breakout", "trend_bb_rsi", "macd_divergence",
+}
+
+# ── 内置分组（系统自带，不可删除/修改）──────────────────────────────
+_BUILTIN_GROUPS: set[str] = {"银行", "科技", "通信", "自选"}
+
+
+def is_builtin_strategy(name: str) -> bool:
+    """Check whether a strategy name belongs to the built-in set."""
+    return name in _BUILTIN_STRATEGIES
+
+
+def is_builtin_group(name: str) -> bool:
+    """Check whether a group name belongs to the built-in set."""
+    return name in _BUILTIN_GROUPS
+
 
 def _discover_plugins(package_name: str, base_class: type,
                       registry: dict[str, type]) -> None:

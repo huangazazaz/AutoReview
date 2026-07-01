@@ -105,6 +105,16 @@ const Backtest = () => {
   const [sortKey, setSortKey] = useState<string>('return_pct')
   const [sortAsc, setSortAsc] = useState(false)
 
+  /* ---- derived ---------------------------------------------------- */
+  const strategyOptions = useMemo(() => {
+    const sys = strategies.filter(s => s.is_builtin)
+    const usr = strategies.filter(s => !s.is_builtin)
+    const groups: { label: string; options: { value: string; label: string }[] }[] = []
+    if (sys.length) groups.push({ label: '系统策略', options: sys.map(s => ({ value: s.name, label: s.name })) })
+    if (usr.length) groups.push({ label: '用户策略', options: usr.map(s => ({ value: s.name, label: s.name })) })
+    return groups
+  }, [strategies])
+
   /* ================================================================ */
   /*  Data loading on mount                                           */
   /* ================================================================ */
@@ -578,7 +588,7 @@ const Backtest = () => {
                 <Select
                   id="strategy-select"
                   placeholder="选择策略…"
-                  options={strategies.map(s => ({ value: s.name, label: s.name }))}
+                  options={strategyOptions}
                   value={selectedStrategy ? { value: selectedStrategy, label: selectedStrategy } : null}
                   onChange={(o) => setSelectedStrategy(o?.value || '')}
                   isClearable

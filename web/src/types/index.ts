@@ -106,6 +106,7 @@ export interface GroupInfo {
   id: string
   name: string
   symbols: GroupSymbol[]
+  is_builtin?: boolean
 }
 
 export interface GroupsResponse {

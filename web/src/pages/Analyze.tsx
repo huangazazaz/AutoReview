@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useApp } from '@/hooks/useApp'
 import { useECharts } from '@/hooks/useECharts'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
@@ -255,6 +255,15 @@ export default function Analyze() {
   const selectedStrategy = strategies.find((s) => s.name === strategyName) ?? undefined
   const stockName = cachedStocks.find((s) => s.symbol === symbol)?.name ?? ''
 
+  const strategyOptions = useMemo(() => {
+    const sys = strategies.filter(s => s.is_builtin)
+    const usr = strategies.filter(s => !s.is_builtin)
+    const groups: { label: string; options: { value: string; label: string }[] }[] = []
+    if (sys.length) groups.push({ label: '系统策略', options: sys.map(s => ({ value: s.name, label: s.name })) })
+    if (usr.length) groups.push({ label: '用户策略', options: usr.map(s => ({ value: s.name, label: s.name })) })
+    return groups
+  }, [strategies])
+
   /* ── Load lookups on mount ─────────────────────────────────────────────── */
   useEffect(() => {
     if (initialLoadDone.current) return
@@ -444,7 +453,7 @@ export default function Analyze() {
               <Select
                 id="analyze-strategy"
                 placeholder="请选择策略"
-                options={strategies.map(s => ({ value: s.name, label: s.name }))}
+                options={strategyOptions}
                 value={strategyName ? { value: strategyName, label: strategyName } : null}
                 onChange={(o) => handleStrategyChange(o?.value || '')}
                 isClearable

@@ -8,15 +8,9 @@ from typing import Optional
 
 from openai import OpenAI
 
-from autotrade.registry import init_registry, get_strategy
+from autotrade.registry import init_registry, get_strategy, is_builtin_strategy
 
 logger = logging.getLogger(__name__)
-
-# Built-in strategies that cannot be deleted
-_BUILTIN_STRATEGIES = {
-    "turtle", "ma_cross", "ma_cross_macd", "hot_money",
-    "golden_filter", "trend_ma_breakout", "trend_bb_rsi", "macd_divergence",
-}
 
 STRATEGY_GEN_PROMPT = """你是一个量化策略工程师。根据用户的自然语言描述，生成一个完整的交易策略。
 
@@ -317,4 +311,4 @@ class StrategyGenerator:
     @staticmethod
     def is_builtin(name: str) -> bool:
         """Check if a strategy name is built-in (protected from deletion)."""
-        return name in _BUILTIN_STRATEGIES
+        return is_builtin_strategy(name)

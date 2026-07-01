@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useApp } from '@/hooks/useApp'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
@@ -36,6 +36,13 @@ function Groups() {
   const [modalError, setModalError] = useState('')
   const [modalSaving, setModalSaving] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+
+  // Sorted: system groups first
+  const sortedGroups = useMemo(() => {
+    const sys = groups.filter(g => g.is_builtin)
+    const usr = groups.filter(g => !g.is_builtin)
+    return [...sys, ...usr]
+  }, [groups])
 
   // ── Load group list ──────────────────────────────────────────────────────
 
@@ -234,7 +241,7 @@ function Groups() {
                 role="listbox"
                 aria-label="分组列表"
               >
-                {groups.map((g) => (
+                {sortedGroups.map((g) => (
                   <li
                     key={g.id}
                     className={`group-list-item${currentGroupId === g.id ? ' active' : ''}`}
@@ -244,10 +251,12 @@ function Groups() {
                     onClick={() => handleGroupClick(g.id)}
                     onKeyDown={(e) => handleGroupKeyDown(e, g.id)}
                   >
-                    <span
-                      className="group-name"
-                      dangerouslySetInnerHTML={{ __html: escapeHtml(g.name) }}
-                    />
+                    <span className="group-name">
+                      <span dangerouslySetInnerHTML={{ __html: escapeHtml(g.name) }} />
+                      {g.is_builtin && (
+                        <span className="badge badge-system" style={{ marginLeft: 6 }}>系统</span>
+                      )}
+                    </span>
                     <span className="group-count">{stockCount(g)} 只股票</span>
                   </li>
                 ))}
@@ -274,26 +283,30 @@ function Groups() {
           ) : (
             <>
               <div className="card-header">
-                <h2
-                  className="card-title"
-                  dangerouslySetInnerHTML={{ __html: escapeHtml(groupDetail.name) }}
-                />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    type="button"
-                    onClick={openEditModal}
-                  >
-                    编辑
-                  </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    type="button"
-                    onClick={handleDelete}
-                  >
-                    删除
-                  </button>
-                </div>
+                <h2 className="card-title">
+                  <span dangerouslySetInnerHTML={{ __html: escapeHtml(groupDetail.name) }} />
+                  {groupDetail.is_builtin && (
+                    <span className="badge badge-system" style={{ marginLeft: 8, fontSize: 11 }}>系统内置</span>
+                  )}
+                </h2>
+                {!groupDetail.is_builtin && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      type="button"
+                      onClick={openEditModal}
+                    >
+                      编辑
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      type="button"
+                      onClick={handleDelete}
+                    >
+                      删除
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="card-body">
                 <p

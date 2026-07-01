@@ -30,6 +30,15 @@ from typing import Optional
 
 from pathlib import Path
 
+# 加载 .env 文件中的环境变量（如 DEEPSEEK_API_KEY）
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path)
+except ImportError:
+    pass
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles

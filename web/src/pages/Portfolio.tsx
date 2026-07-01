@@ -15,7 +15,7 @@ export default function Portfolio() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [inputMode, setInputMode] = useState<'symbols' | 'group'>('symbols')
-  const [symbols, setSymbols] = useState('all')
+  const [symbols, setSymbols] = useState('')
   const [group, setGroup] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -60,7 +60,12 @@ export default function Portfolio() {
       if (!group) { showToast('请选择分组', 'warning'); return }
       params.group = group
     } else {
-      params.symbols = symbols || 'all'
+      const trimmed = (symbols || '').trim()
+      if (!trimmed) {
+        showToast('请至少选择一只股票，输入代码搜索后回车添加', 'warning')
+        return
+      }
+      params.symbols = trimmed
     }
 
     if (strategy) {
@@ -154,19 +159,19 @@ export default function Portfolio() {
                     value: s.symbol,
                     label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`
                   }))}
-                  value={symbols && symbols !== 'all'
+                  value={symbols
                     ? symbols.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).map(sym => {
                         const found = cachedStocks.find(cs => cs.symbol === sym)
                         return { value: sym, label: found ? `${sym} - ${found.name}` : sym }
                       })
                     : []}
                   onChange={(opts) => {
-                    const vals = opts.map(o => o.value)
-                    setSymbols(vals.length ? vals.join(',') : 'all')
+                    const vals = (opts ?? []).map(o => o.value)
+                    setSymbols(vals.length ? vals.join(',') : '')
                   }}
                   onCreateOption={(input) => {
                     const newSym = input.toUpperCase()
-                    const current = symbols === 'all' ? [] : symbols.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+                    const current = symbols ? symbols.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : []
                     if (!current.includes(newSym)) {
                       current.push(newSym)
                       setSymbols(current.join(','))

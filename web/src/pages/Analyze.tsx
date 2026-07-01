@@ -286,11 +286,14 @@ export default function Analyze() {
       if (def) {
         setStrategyName(def.name)
         defaultSet.current = true
-        if (def.param_schema) {
+        // Populate params from YAML config values (same as handleStrategyChange)
+        if (def.params) {
           const initial: Record<string, string> = {}
-          for (const [key, entry] of Object.entries(def.param_schema)) {
-            if (entry.default !== undefined) {
-              initial[key] = String(entry.default)
+          for (const [key, val] of Object.entries(def.params)) {
+            if (Array.isArray(val) || (typeof val === 'object' && val !== null)) {
+              initial[key] = JSON.stringify(val)
+            } else {
+              initial[key] = String(val ?? '')
             }
           }
           setStrategyParams(initial)

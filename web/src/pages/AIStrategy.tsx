@@ -32,6 +32,15 @@ export default function AIStrategy() {
     }
   }, [])
 
+  // 默认日期：最近1年
+  useEffect(() => {
+    const now = new Date()
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - 1)
+    setStartDate(d.toISOString().slice(0, 10))
+    setEndDate(now.toISOString().slice(0, 10))
+  }, [])
+
   const loadSession = useCallback(async (sessionId: string) => {
     try {
       const data = await api.getChatHistory(sessionId)

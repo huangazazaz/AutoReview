@@ -26,6 +26,22 @@ const PERIODS = [
   { value: '5Y', label: '5年' },
 ]
 
+function getPeriodDates(period: string): { start: string; end: string } {
+  const now = new Date()
+  const end = now.toISOString().slice(0, 10)
+  const d = new Date()
+  switch (period) {
+    case '1M': d.setMonth(d.getMonth() - 1); break
+    case '3M': d.setMonth(d.getMonth() - 3); break
+    case '6M': d.setMonth(d.getMonth() - 6); break
+    case '1Y': d.setFullYear(d.getFullYear() - 1); break
+    case '2Y': d.setFullYear(d.getFullYear() - 2); break
+    case '5Y': d.setFullYear(d.getFullYear() - 5); break
+    default: return { start: '', end }
+  }
+  return { start: d.toISOString().slice(0, 10), end }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Medal SVGs                                                        */
 /* ------------------------------------------------------------------ */
@@ -65,7 +81,7 @@ const Backtest = () => {
   const [symbols, setSymbols] = useState('')
   const [selectedGroup, setSelectedGroup] = useState('')
   const [selectedStrategy, setSelectedStrategy] = useState('')
-  const [selectedPeriod, setSelectedPeriod] = useState('')
+  const [selectedPeriod, setSelectedPeriod] = useState('1Y')
   const [selectedDatasource, setSelectedDatasource] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -117,6 +133,13 @@ const Backtest = () => {
     return () => { cancelled = true }
   }, [])
 
+  /* ---- Set initial dates from default period (1Y) ----------------- */
+  useEffect(() => {
+    const { start, end } = getPeriodDates('1Y')
+    setStartDate(start)
+    setEndDate(end)
+  }, [])
+
   /* ================================================================ */
   /*  Add cached stock helpers                                        */
   /* ================================================================ */
@@ -129,6 +152,13 @@ const Backtest = () => {
         .filter(Boolean),
     [symbols],
   )
+
+  const handlePeriodChange = useCallback((value: string) => {
+    setSelectedPeriod(value)
+    const { start, end } = getPeriodDates(value)
+    setStartDate(start)
+    setEndDate(end)
+  }, [])
 
   /* ================================================================ */
   /*  Find selected strategy object (for StrategyParamsEditor)        */
@@ -570,7 +600,7 @@ const Backtest = () => {
                   placeholder="默认"
                   options={PERIODS}
                   value={PERIODS.find(p => p.value === selectedPeriod) || null}
-                  onChange={(o) => setSelectedPeriod(o?.value || '')}
+                  onChange={(o) => handlePeriodChange(o?.value || '1Y')}
                   menuPortalTarget={document.body}
                   className="react-select"
                   classNamePrefix="rs"

@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '@/hooks/useApp'
 import { useECharts } from '@/hooks/useECharts'
+import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, escapeHtml } from '@/utils/format'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
-import type { StrategyInfo, BacktestSummary, BacktestResultItem, CachedStock, GroupInfo } from '@/types'
+import type { StrategyInfo, BacktestSummary, BacktestResultItem, GroupInfo } from '@/types'
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -92,7 +93,7 @@ const Backtest = () => {
   const [strategies, setStrategies] = useState<StrategyInfo[]>([])
   const [datasources, setDatasources] = useState<string[]>([])
   const [groups, setGroups] = useState<GroupInfo[]>([])
-  const [cachedStocks, setCachedStocks] = useState<CachedStock[]>([])
+  const { stocks: cachedStocks } = useCachedStocks()
 
   /* ---- results --------------------------------------------------- */
   const [summary, setSummary] = useState<BacktestSummary | null>(null)
@@ -113,17 +114,15 @@ const Backtest = () => {
 
     const load = async () => {
       try {
-        const [stratRes, dsRes, grpRes, cachedRes] = await Promise.all([
+        const [stratRes, dsRes, grpRes] = await Promise.all([
           api.getStrategies(),
           api.getDatasources(),
           api.getGroups(),
-          api.getCachedStocks(),
         ])
         if (cancelled) return
         setStrategies(stratRes.strategies ?? [])
         setDatasources(dsRes.datasources ?? [])
         setGroups(grpRes.groups ?? [])
-        setCachedStocks(cachedRes.symbols ?? [])
       } catch (err) {
         if (!cancelled) console.error('Failed to load initial data:', err)
       }

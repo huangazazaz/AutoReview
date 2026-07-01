@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import CreatableSelect from 'react-select/creatable'
 import { useApp } from '@/hooks/useApp'
+import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
 import { formatNumber, formatPct, formatAmount } from '@/utils/format'
-import type { StrategyInfo, GroupInfo, PortfolioBacktestResponse, CachedStock } from '@/types'
+import type { StrategyInfo, GroupInfo, PortfolioBacktestResponse } from '@/types'
 
 export default function Portfolio() {
   const { showToast, showLoading: showGlobalLoading, hideLoading } = useApp()
@@ -21,7 +22,7 @@ export default function Portfolio() {
 
   const [strategies, setStrategies] = useState<StrategyInfo[]>([])
   const [groups, setGroups] = useState<GroupInfo[]>([])
-  const [cachedStocks, setCachedStocks] = useState<CachedStock[]>([])
+  const { stocks: cachedStocks } = useCachedStocks()
   const [result, setResult] = useState<PortfolioBacktestResponse | null>(null)
 
   const [paramSchema, setParamSchema] = useState<Record<string, { default?: unknown; type?: string }>>({})
@@ -31,7 +32,6 @@ export default function Portfolio() {
   useEffect(() => {
     api.getStrategies().then(d => setStrategies(d.strategies))
     api.getGroups().then(d => setGroups(d.groups))
-    api.getCachedStocks().then(d => setCachedStocks(d.symbols)).catch(() => {})
   }, [])
 
   // 默认日期：最近1年

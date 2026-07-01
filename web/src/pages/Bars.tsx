@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import CreatableSelect from 'react-select/creatable'
 import { useECharts } from '@/hooks/useECharts'
+import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
@@ -8,11 +9,6 @@ import type { BarsResponse, Bar } from '@/types'
 import type { EChartsOption } from 'echarts'
 
 // ── Types ──────────────────────────────────────────────────────────────────
-
-interface CachedStock {
-  symbol: string
-  name: string
-}
 
 interface BarStats {
   label0: string
@@ -126,24 +122,9 @@ function Bars() {
   const [responseSymbol, setResponseSymbol] = useState('')
 
   // UI state
-  const [cachedStocks, setCachedStocks] = useState<CachedStock[]>([])
+  const { stocks: cachedStocks } = useCachedStocks()
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [chartSummary, setChartSummary] = useState('')
-
-  // ── Load cached stocks for autocomplete ──────────────────────────────
-  useEffect(() => {
-    const loadStocks = async () => {
-      try {
-        const result = await api.getCachedStocks()
-        if (result?.symbols?.length) {
-          setCachedStocks(result.symbols)
-        }
-      } catch {
-        // Autocomplete will just be empty — non-critical
-      }
-    }
-    loadStocks()
-  }, [])
 
   // ── Keep selectedIdxRef in sync ────────────────────────────────────
   useEffect(() => {

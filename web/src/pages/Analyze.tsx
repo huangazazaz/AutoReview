@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useApp } from '@/hooks/useApp'
 import { useECharts } from '@/hooks/useECharts'
+import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState, TrendIndicator } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
-import type { AnalyzeResult, StrategyInfo, Bar, Trade, CachedStock } from '@/types'
+import type { AnalyzeResult, StrategyInfo, Bar, Trade } from '@/types'
 import * as echarts from 'echarts'
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -238,7 +239,7 @@ export default function Analyze() {
   /* ── Reference / lookup data ───────────────────────────────────────────── */
   const [strategies, setStrategies] = useState<StrategyInfo[]>([])
   const [datasources, setDatasources] = useState<string[]>([])
-  const [cachedStocks, setCachedStocks] = useState<CachedStock[]>([])
+  const { stocks: cachedStocks } = useCachedStocks()
 
   /* ── Results ───────────────────────────────────────────────────────────── */
   const [result, setResult] = useState<AnalyzeResult | null>(null)
@@ -262,11 +263,9 @@ export default function Analyze() {
     Promise.all([
       api.getStrategies().then((r) => r.strategies).catch(() => [] as StrategyInfo[]),
       api.getDatasources().then((r) => r.datasources).catch(() => [] as string[]),
-      api.getCachedStocks().then((r) => r.symbols).catch(() => [] as CachedStock[]),
-    ]).then(([strats, dss, stocks]) => {
+    ]).then(([strats, dss]) => {
       setStrategies(strats)
       setDatasources(dss)
-      setCachedStocks(stocks)
     })
   }, [])
 

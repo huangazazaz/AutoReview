@@ -115,6 +115,42 @@ class MomentumScreener(Screener):
 
         return result
 
+    def explain(
+        self, market_data: dict[str, pd.DataFrame],
+        symbol: str, date: date,
+    ) -> dict[str, float]:
+        """返回动量选股的7因子明细得分。"""
+        df = market_data.get(symbol)
+        if df is None:
+            return {}
+        idx = self._index_of(df, date)
+        if idx is None or idx < self.exclude_min_history_days:
+            return {}
+
+        factors: dict[str, float] = {}
+
+        v = self._calc_momentum_1m(df, idx)
+        factors["动量强度"] = round(self._score_s_curve(v, center=0.15, k=15, floor=0.0, ceil=1.0), 4) if v is not None else 0.0
+
+        v = self._calc_momentum_5d(df, idx)
+        factors["短期回调"] = round(self._score_s_curve(v, center=-0.02, k=20, floor=0.0, ceil=1.0, reverse=True), 4) if v is not None else 0.0
+
+        v = self._calc_vol_ratio(df, idx)
+        factors["量能确认"] = round(self._score_peak(v, peak=1.5, width=1.0, floor=0.0), 4) if v is not None else 0.0
+
+        factors["均线排列"] = round(self._calc_ma_score(df, idx), 4)
+
+        v = self._calc_pullback(df, idx)
+        factors["回调距离"] = round(self._score_peak(v, peak=0.02, width=0.04, floor=0.0), 4) if v is not None else 0.0
+
+        v = self._calc_atr_ratio(df, idx)
+        factors["波动率"] = round(self._score_peak(v, peak=0.035, width=0.02, floor=0.0), 4) if v is not None else 0.0
+
+        v = self._calc_consistency(df, idx)
+        factors["一致性"] = round(self._score_peak(v, peak=0.65, width=0.15, floor=0.0), 4) if v is not None else 0.0
+
+        return factors
+
     # ------------------------------------------------------------------
     # 预过滤
     # ------------------------------------------------------------------

@@ -85,3 +85,19 @@ class Screener(ABC):
             {date: [(symbol, score, signal_type), ...]}
             每日按 score 降序排列的候选列表，signal_type 为 "breakout"/"reversal"。
         """
+
+    def explain(self, market_data: dict[str, pd.DataFrame],
+                symbol: str, date: date) -> dict[str, float]:
+        """返回指定股票在指定日期的因子明细得分。
+
+        子类可选实现，默认返回空字典。
+
+        Args:
+            market_data: {symbol: OHLCV DataFrame}
+            symbol: 目标股票代码
+            date: 目标日期
+
+        Returns:
+            {因子中文名: 得分(0.0~1.0)}
+        """
+        return {}

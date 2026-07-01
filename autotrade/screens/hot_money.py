@@ -152,6 +152,74 @@ class HotMoneyScreener(Screener):
 
         return result
 
+    def explain(
+        self, market_data: dict[str, pd.DataFrame],
+        symbol: str, date: date,
+    ) -> dict[str, float]:
+        """返回热钱选股的因子明细得分。"""
+        import numpy as np
+        df = market_data.get(symbol)
+        if df is None:
+            return {}
+        idx = self._index_of(df, date)
+        if idx is None or idx < self.exclude_min_history_days:
+            return {}
+        if not self._passes_prefilter(df, idx):
+            return {}
+
+        factors: dict[str, float] = {}
+
+        # 趋势强度: MA20 / MA60 的比值映射到 0-1
+        ma_f = float(df["_ma_fast"].iloc[idx])
+        ma_m = float(df["_ma_mid"].iloc[idx])
+        if not np.isnan(ma_f) and not np.isnan(ma_m) and ma_m > 0:
+            trend = min((ma_f / ma_m - 1) * 5, 1.0)
+            factors["趋势强度"] = round(max(trend, 0.0), 4)
+        else:
+            factors["趋势强度"] = 0.0
+
+        # 动量得分: 60日涨幅映射
+        if "_mom_ret" in df.columns:
+            mr = float(df["_mom_ret"].iloc[idx])
+            if not np.isnan(mr):
+                momentum = min(max(mr, 0.05), 0.40) / 0.35
+                factors["动量得分"] = round(momentum, 4)
+            else:
+                factors["动量得分"] = 0.0
+        else:
+            factors["动量得分"] = 0.0
+
+        # 当日量比
+        v = float(df["volume"].iloc[idx])
+        vol_ma = float(df["volume"].iloc[max(0, idx - 20):idx].mean()) if idx > 0 else 0
+        if vol_ma > 0:
+            vol_ratio = v / vol_ma
+            factors["量能得分"] = round(min(vol_ratio / 3.0, 1.0), 4)
+        else:
+            factors["量能得分"] = 0.0
+
+        # 当日涨幅
+        c = float(df["close"].iloc[idx])
+        c_prev = float(df["close"].iloc[idx - 1])
+        if c_prev > 0:
+            gain = (c - c_prev) / c_prev
+            factors["涨幅得分"] = round(min(max(gain, 0.0) / 0.05, 1.0), 4)
+        else:
+            factors["涨幅得分"] = 0.0
+
+        # 突破力度（收盘价 vs 10日最高价）
+        if idx >= 10:
+            recent_high = float(df["high"].iloc[idx - 10:idx].max())
+            if recent_high > 0 and c > recent_high:
+                break_str = (c - recent_high) / recent_high
+                factors["突破力度"] = round(min(break_str * 10, 1.0), 4)
+            else:
+                factors["突破力度"] = 0.0
+        else:
+            factors["突破力度"] = 0.0
+
+        return factors
+
     # ------------------------------------------------------------------
     def _evaluate(
         self, sym: str, df: pd.DataFrame, idx: int,

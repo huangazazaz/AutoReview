@@ -4,12 +4,13 @@ import { useApp } from '@/hooks/useApp'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { useCachedStrategies } from '@/hooks/useCachedStrategies'
 import { useCachedGroups } from '@/hooks/useCachedGroups'
+import { useStockSearch } from '@/hooks/useStockSearch'
 import { useECharts } from '@/hooks/useECharts'
 import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
 import { formatNumber, formatPct, formatAmount } from '@/utils/format'
-import { MAX_DATE, filterStockOption } from '@/utils/date'
+import { MAX_DATE } from '@/utils/date'
 import type { PortfolioBacktestResponse, PortfolioTrade } from '@/types'
 
 export default function Portfolio() {
@@ -27,12 +28,7 @@ export default function Portfolio() {
   const { strategies } = useCachedStrategies()
   const { groups } = useCachedGroups()
   const { stocks: cachedStocks } = useCachedStocks()
-
-  const stockOptions = useMemo(() =>
-    cachedStocks.map(s => ({
-      value: s.symbol,
-      label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`,
-    })), [cachedStocks])
+  const stockSearch = useStockSearch(cachedStocks)
   const [result, setResult] = useState<PortfolioBacktestResponse | null>(null)
 
   const [paramSchema, setParamSchema] = useState<Record<string, { default?: unknown; type?: string }>>({})
@@ -183,8 +179,10 @@ export default function Portfolio() {
                   id="pf-symbols"
                   isMulti
                   placeholder="输入代码或名称搜索股票，可多选…"
-                  options={stockOptions}
-                  filterOption={filterStockOption}
+                  options={stockSearch.options}
+                  inputValue={stockSearch.input}
+                  onInputChange={stockSearch.setInput}
+                  filterOption={null}
                   value={symbols
                     ? symbols.split(',').map(s => s.trim().toUpperCase()).filter(Boolean).map(sym => {
                         const found = cachedStocks.find(cs => cs.symbol === sym)
@@ -203,10 +201,6 @@ export default function Portfolio() {
                       setSymbols(current.join(','))
                     }
                   }}
-                  filterOption={(opt, input) => {
-                    const q = input.toLowerCase()
-                    return opt.data.label.toLowerCase().includes(q)
-                  }}
                   isClearable
                   isSearchable
                   isLoading={cachedStocks.length === 0}
@@ -214,7 +208,8 @@ export default function Portfolio() {
                   menuPortalTarget={document.body}
                   className="react-select"
                   classNamePrefix="rs"
-                  noOptionsMessage={() => '未找到，输入代码后按回车创建'}
+                  noOptionsMessage={({ inputValue }) =>
+                    inputValue ? '未找到，输入代码后按回车创建' : '输入代码或名称开始搜索'}
                   formatCreateLabel={(v) => `添加 "${v.toUpperCase()}"`}
                 />
                 <div className="form-hint">直接输入代码可添加任意股票，留空则使用全市场</div>

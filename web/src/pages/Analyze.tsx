@@ -3,11 +3,12 @@ import { useApp } from '@/hooks/useApp'
 import { useECharts } from '@/hooks/useECharts'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { useCachedStrategies } from '@/hooks/useCachedStrategies'
+import { useStockSearch } from '@/hooks/useStockSearch'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState, TrendIndicator } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
-import { MAX_DATE, filterStockOption } from '@/utils/date'
+import { MAX_DATE } from '@/utils/date'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 import type { AnalyzeResult, Bar, Trade } from '@/types'
@@ -249,6 +250,7 @@ export default function Analyze() {
   const { strategies } = useCachedStrategies()
   const [datasources, setDatasources] = useState<string[]>([])
   const { stocks: cachedStocks } = useCachedStocks()
+  const stockSearch = useStockSearch(cachedStocks)
 
   /* ── Results ───────────────────────────────────────────────────────────── */
   const [result, setResult] = useState<AnalyzeResult | null>(null)
@@ -272,12 +274,6 @@ export default function Analyze() {
     if (usr.length) groups.push({ label: '用户策略', options: usr.map(s => ({ value: s.name, label: s.name })) })
     return groups
   }, [strategies])
-
-  const stockOptions = useMemo(() =>
-    cachedStocks.map(s => ({
-      value: s.symbol,
-      label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`,
-    })), [cachedStocks])
 
   /* ── Load lookups on mount ─────────────────────────────────────────────── */
   useEffect(() => {
@@ -458,18 +454,12 @@ export default function Analyze() {
               <CreatableSelect
                 id="analyze-symbol"
                 placeholder="输入代码或名称搜索股票…"
-                options={stockOptions}
-                filterOption={filterStockOption}
-                value={symbol ? cachedStocks.find(s => s.symbol === symbol.toUpperCase())
-                  ? { value: symbol.toUpperCase(), label: `${symbol.toUpperCase()}${cachedStocks.find(s => s.symbol === symbol.toUpperCase())?.name ? ` - ${cachedStocks.find(s => s.symbol === symbol.toUpperCase())!.name}` : ''}` }
-                  : { value: symbol.toUpperCase(), label: symbol.toUpperCase() }
-                  : null}
+                options={stockSearch.options}
+                inputValue={stockSearch.input}
+                onInputChange={stockSearch.setInput}
+                value={symbol ? { value: symbol.toUpperCase(), label: stockSearch.getLabel(symbol.toUpperCase()) } : null}
                 onChange={(o) => setSymbol(o?.value?.toUpperCase() || '')}
                 onCreateOption={(input) => setSymbol(input.toUpperCase())}
-                filterOption={(opt, input) => {
-                  const q = input.toLowerCase()
-                  return opt.data.label.toLowerCase().includes(q)
-                }}
                 isClearable
                 isSearchable
                 isLoading={cachedStocks.length === 0}
@@ -477,8 +467,10 @@ export default function Analyze() {
                 menuPortalTarget={document.body}
                 className="react-select"
                 classNamePrefix="rs"
-                noOptionsMessage={() => '未找到，输入代码后按回车创建'}
+                noOptionsMessage={({ inputValue }) =>
+                  inputValue ? '未找到，输入代码后按回车创建' : '输入代码或名称开始搜索'}
                 formatCreateLabel={(v) => `使用 "${v.toUpperCase()}"`}
+                filterOption={null}
               />
             </div>
 

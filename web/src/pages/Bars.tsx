@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import CreatableSelect from 'react-select/creatable'
 import { useECharts } from '@/hooks/useECharts'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
+import { useStockSearch } from '@/hooks/useStockSearch'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
-import { MAX_DATE, filterStockOption } from '@/utils/date'
+import { MAX_DATE } from '@/utils/date'
 import type { BarsResponse, Bar } from '@/types'
 import type { EChartsOption } from 'echarts'
 
@@ -124,13 +125,8 @@ function Bars() {
 
   // UI state
   const { stocks: cachedStocks } = useCachedStocks()
+  const stockSearch = useStockSearch(cachedStocks)
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
-
-  const stockOptions = useMemo(() =>
-    cachedStocks.map(s => ({
-      value: s.symbol,
-      label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`,
-    })), [cachedStocks])
   const [chartSummary, setChartSummary] = useState('')
 
   // ── Keep selectedIdxRef in sync ────────────────────────────────────
@@ -390,18 +386,13 @@ function Bars() {
                 <CreatableSelect
                   id="bars-symbol"
                   placeholder="输入代码或名称搜索股票…"
-                  options={stockOptions}
-                  filterOption={filterStockOption}
-                  value={symbol ? cachedStocks.find(s => s.symbol === symbol.toUpperCase())
-                    ? { value: symbol.toUpperCase(), label: `${symbol.toUpperCase()}${cachedStocks.find(s => s.symbol === symbol.toUpperCase())?.name ? ` - ${cachedStocks.find(s => s.symbol === symbol.toUpperCase())!.name}` : ''}` }
-                    : { value: symbol.toUpperCase(), label: symbol.toUpperCase() }
-                    : null}
+                  options={stockSearch.options}
+                  inputValue={stockSearch.input}
+                  onInputChange={stockSearch.setInput}
+                  filterOption={null}
+                  value={symbol ? { value: symbol.toUpperCase(), label: stockSearch.getLabel(symbol.toUpperCase()) } : null}
                   onChange={(o) => setSymbol(o?.value?.toUpperCase() || '')}
                   onCreateOption={(input) => setSymbol(input.toUpperCase())}
-                  filterOption={(opt, input) => {
-                    const q = input.toLowerCase()
-                    return opt.data.label.toLowerCase().includes(q)
-                  }}
                   isClearable
                   isSearchable
                   isLoading={cachedStocks.length === 0}
@@ -409,7 +400,8 @@ function Bars() {
                   menuPortalTarget={document.body}
                   className="react-select"
                   classNamePrefix="rs"
-                  noOptionsMessage={() => '未找到，输入代码后按回车创建'}
+                  noOptionsMessage={({ inputValue }) =>
+                    inputValue ? '未找到，输入代码后按回车创建' : '输入代码或名称开始搜索'}
                   formatCreateLabel={(v) => `使用 "${v.toUpperCase()}"`}
                 />
               </div>

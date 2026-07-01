@@ -5,11 +5,12 @@ import { useECharts } from '@/hooks/useECharts'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { useCachedStrategies } from '@/hooks/useCachedStrategies'
 import { useCachedGroups } from '@/hooks/useCachedGroups'
+import { useStockSearch } from '@/hooks/useStockSearch'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, escapeHtml } from '@/utils/format'
-import { MAX_DATE, filterStockOption } from '@/utils/date'
+import { MAX_DATE } from '@/utils/date'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 import type { StrategyInfo, BacktestSummary, BacktestResultItem } from '@/types'
@@ -96,6 +97,7 @@ const Backtest = () => {
   const [datasources, setDatasources] = useState<string[]>([])
   const { groups } = useCachedGroups()
   const { stocks: cachedStocks } = useCachedStocks()
+  const stockSearch = useStockSearch(cachedStocks)
 
   /* ---- results --------------------------------------------------- */
   const [summary, setSummary] = useState<BacktestSummary | null>(null)
@@ -116,12 +118,6 @@ const Backtest = () => {
     if (usr.length) groups.push({ label: '用户策略', options: usr.map(s => ({ value: s.name, label: s.name })) })
     return groups
   }, [strategies])
-
-  const stockOptions = useMemo(() =>
-    cachedStocks.map(s => ({
-      value: s.symbol,
-      label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}`,
-    })), [cachedStocks])
 
   /* ================================================================ */
   /*  Data loading on mount                                           */
@@ -514,12 +510,14 @@ const Backtest = () => {
                       id="symbols-input"
                       isMulti
                       placeholder="输入代码或名称搜索股票，支持多选…"
-                      options={stockOptions}
-                      filterOption={filterStockOption}
+                      options={stockSearch.options}
+                      inputValue={stockSearch.input}
+                      onInputChange={stockSearch.setInput}
+                      filterOption={null}
                       value={symbolsArray.map(code => {
-                        const s = cachedStocks.find(c => c.symbol === code)
-                        return s
-                          ? { value: s.symbol, label: `${s.symbol}${s.name ? ` - ${s.name}` : ''}` }
+                        const found = cachedStocks.find(c => c.symbol === code)
+                        return found
+                          ? { value: found.symbol, label: `${found.symbol} - ${found.name}` }
                           : { value: code, label: code }
                       })}
                       onChange={(items) => {
@@ -532,10 +530,6 @@ const Backtest = () => {
                           setSymbols(symbols ? `${symbols}, ${code}` : code)
                         }
                       }}
-                      filterOption={(opt, input) => {
-                        const q = input.toLowerCase()
-                        return opt.data.label.toLowerCase().includes(q)
-                      }}
                       isClearable
                       isSearchable
                       isLoading={cachedStocks.length === 0}
@@ -543,7 +537,8 @@ const Backtest = () => {
                       menuPortalTarget={document.body}
                       className="react-select"
                       classNamePrefix="rs"
-                      noOptionsMessage={() => '未找到，输入代码后按回车添加'}
+                      noOptionsMessage={({ inputValue }) =>
+                        inputValue ? '未找到，输入代码后按回车添加' : '输入代码或名称开始搜索'}
                       formatCreateLabel={(v) => `添加 "${v.toUpperCase()}"`}
                     />
                   </div>

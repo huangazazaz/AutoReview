@@ -21,7 +21,7 @@ import type {
   UserInfo,
 } from '@/types'
 
-const BASE = ''
+const BASE = '/api'
 
 function getToken(): string | null {
   return localStorage.getItem('auth_token')

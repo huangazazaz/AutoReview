@@ -39,11 +39,9 @@ try:
 except ImportError:
     pass
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
 from pydantic import BaseModel
 
 from autotrade.core.engine import analyze_stock, run_backtest, run_portfolio_backtest
@@ -90,48 +88,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- SPA fallback 中间件 ----
-# 浏览器直接访问 /groups、/strategies 等路径时，Accept 头包含 text/html。
-# FastAPI 会优先匹配到同名 API 路由返回 JSON，导致页面渲染失败。
-# 此中间件在 API 路由之前拦截浏览器请求，返回 index.html。
+# ---- API 路由（统一前缀 /api）----
+api_router = APIRouter(prefix="/api")
 
-_SPA_ROUTES = {
-    "/", "/login", "/register", "/dashboard",
-    "/analyze", "/backtest", "/portfolio", "/ai-strategy",
-    "/bars", "/groups",
-}
+# ---- 认证路由（挂载到 /api/auth）----
+app.include_router(auth_router, prefix="/api")
 
-# Resolve the SPA index.html path once at import time
-_SPA_INDEX = Path(__file__).resolve().parent.parent.parent / "web" / "dist" / "index.html"
-
-
-class SPAFallbackMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # Only intercept GET requests that are page navigations, not API calls.
-        # Sec-Fetch-Dest: document = browser page load
-        # Sec-Fetch-Dest: empty/other = fetch()/XHR API call
-        if request.method == "GET" and _SPA_INDEX.exists():
-            fetch_dest = request.headers.get("sec-fetch-dest", "")
-            if fetch_dest == "document":
-                path = request.url.path
-                # Serve index.html for known SPA routes
-                if path in _SPA_ROUTES or (
-                    "/" in path
-                    and "." not in path.rsplit("/", 1)[-1]
-                    and not path.startswith("/assets/")
-                    and not path.startswith("/auth/")
-                    and not path.startswith("/ai/")
-                    and not path.startswith("/cache/")
-                    and path not in ("/health", "/strategies", "/datasources")
-                ):
-                    from fastapi.responses import FileResponse
-                    return FileResponse(_SPA_INDEX)
-        return await call_next(request)
-
-app.add_middleware(SPAFallbackMiddleware)
-
-# ---- 认证路由 ----
-app.include_router(auth_router)
+app.include_router(api_router)
 
 logger = logging.getLogger(__name__)
 
@@ -224,7 +187,7 @@ def _startup():
 
 # ---- API 端点 ----
 
-@app.post("/analyze")
+@api_router.post("/analyze")
 def api_analyze(req: AnalyzeRequest):
     """单股分析回测。"""
     from autotrade.core.config import get_strategy_params
@@ -247,7 +210,7 @@ def api_analyze(req: AnalyzeRequest):
     return _format_result(result, req.symbol)
 
 
-@app.post("/backtest")
+@api_router.post("/backtest")
 def api_backtest(req: BacktestRequest):
     """批量回测（多股或分组）。"""
     from autotrade.triggers.cli import _resolve_input, _load_group_names
@@ -278,7 +241,7 @@ def api_backtest(req: BacktestRequest):
     return summary
 
 
-@app.post("/portfolio-backtest")
+@api_router.post("/portfolio-backtest")
 def api_portfolio_backtest(req: PortfolioBacktestRequest):
     """组合/账户级回测：单账户多持仓 + Screener选股 + 策略择时。
 
@@ -324,7 +287,7 @@ def _get_deepseek_api_key() -> Optional[str]:
     return os.environ.get("DEEPSEEK_API_KEY")
 
 
-@app.post("/ai/generate-strategy")
+@api_router.post("/ai/generate-strategy")
 def api_generate_strategy(req: GenerateStrategyRequest):
     """AI 生成交易策略 + 单股快速回测。"""
     from autotrade.ai.strategy_generator import StrategyGenerator
@@ -432,7 +395,7 @@ def api_generate_strategy(req: GenerateStrategyRequest):
     }
 
 
-@app.post("/ai/chat")
+@api_router.post("/ai/chat")
 def api_chat(req: ChatRequest):
     """多轮对话式 AI 策略生成与修改。"""
     from autotrade.ai.strategy_generator import StrategyGenerator
@@ -601,7 +564,7 @@ def api_chat(req: ChatRequest):
     ).model_dump()
 
 
-@app.get("/ai/chat/{session_id}")
+@api_router.get("/ai/chat/{session_id}")
 def api_get_chat(session_id: str):
     """获取会话完整历史。"""
     session = _session_store.get_session(session_id)
@@ -630,7 +593,7 @@ def api_get_chat(session_id: str):
     ).model_dump()
 
 
-@app.delete("/ai/chat/{session_id}")
+@api_router.delete("/ai/chat/{session_id}")
 def api_delete_chat(session_id: str):
     """删除会话。"""
     deleted = _session_store.delete_session(session_id)
@@ -639,7 +602,7 @@ def api_delete_chat(session_id: str):
     return {"ok": True}
 
 
-@app.post("/strategies/save")
+@api_router.post("/strategies/save")
 def api_save_strategy(req: SaveStrategyRequest):
     """保存 AI 生成的策略到文件系统。"""
     from autotrade.ai.strategy_generator import StrategyGenerator
@@ -672,7 +635,7 @@ def api_save_strategy(req: SaveStrategyRequest):
     }
 
 
-@app.delete("/strategies/{name}")
+@api_router.delete("/strategies/{name}")
 def api_delete_strategy(name: str):
     """删除 AI 生成的策略。内置策略不可删除。"""
     from autotrade.ai.strategy_generator import StrategyGenerator
@@ -698,7 +661,7 @@ def api_delete_strategy(name: str):
     return {"success": True, "name": name, "deleted": deleted}
 
 
-@app.get("/strategies")
+@api_router.get("/strategies")
 def api_list_strategies():
     """列出可用策略及其参数信息。"""
     from autotrade.core.config import get_strategy_params
@@ -781,13 +744,13 @@ def _python_type_to_str(t: type) -> str:
     return "str"
 
 
-@app.get("/datasources")
+@api_router.get("/datasources")
 def api_list_datasources_api():
     """列出可用数据源。"""
     return {"datasources": list_datasources()}
 
 
-@app.get("/groups")
+@api_router.get("/groups")
 def api_list_groups():
     """列出股票分组。"""
     from pathlib import Path
@@ -862,7 +825,7 @@ def _write_group(group_id: str, name: str, symbols: list[GroupSymbol]):
         yaml.dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 
-@app.get("/groups/{group_id}")
+@api_router.get("/groups/{group_id}")
 def api_get_group(group_id: str):
     """获取单个分组详情。"""
     g = _read_group(group_id)
@@ -871,7 +834,7 @@ def api_get_group(group_id: str):
     return g
 
 
-@app.post("/groups")
+@api_router.post("/groups")
 def api_create_group(req: GroupCreate):
     """创建股票分组。"""
     path = _group_path(req.id)
@@ -882,7 +845,7 @@ def api_create_group(req: GroupCreate):
     return _read_group(req.id)
 
 
-@app.put("/groups/{group_id}")
+@api_router.put("/groups/{group_id}")
 def api_update_group(group_id: str, req: GroupUpdate):
     """更新股票分组。"""
     if is_builtin_group(group_id):
@@ -896,7 +859,7 @@ def api_update_group(group_id: str, req: GroupUpdate):
     return _read_group(group_id)
 
 
-@app.delete("/groups/{group_id}")
+@api_router.delete("/groups/{group_id}")
 def api_delete_group(group_id: str):
     """删除股票分组。"""
     if is_builtin_group(group_id):
@@ -917,7 +880,7 @@ class BarsRequest(BaseModel):
     period: Optional[str] = "1y"
 
 
-@app.post("/bars")
+@api_router.post("/bars")
 def api_get_bars(req: BarsRequest):
     """查询日线数据 (OHLCV)。"""
     from autotrade.core.datasource_factory import build_datasource_from_name
@@ -951,7 +914,7 @@ def api_get_bars(req: BarsRequest):
     }
 
 
-@app.get("/health")
+@api_router.get("/health")
 def health():
     return {"status": "ok"}
 
@@ -1174,7 +1137,7 @@ def _build_stocks_metadata_cache(force_rebuild: bool = False) -> list[dict]:
     return result
 
 
-@app.get("/cache/stocks")
+@api_router.get("/cache/stocks")
 def api_cache_stocks(
     page: int = Query(0, ge=0, description="页码（0=不分页，返回全部）"),
     size: int = Query(50, ge=1, le=500, description="每页条数"),

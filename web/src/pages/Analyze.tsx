@@ -84,7 +84,15 @@ function buildChartOption(
 
   const dates = curve.map((d: any) => d.date ?? d.time ?? '')
   const equityData = curve.map((d: any) => d.equity ?? d.value ?? 0)
-  const drawdownData = curve.map((d: any) => d.drawdown ?? 0)
+
+  // Compute running drawdown from equity curve (no pre-computed field in API)
+  const drawdownData: number[] = []
+  let peak = -Infinity
+  for (const eq of equityData) {
+    if (eq > peak) peak = eq
+    drawdownData.push(peak > 0 ? (eq - peak) / peak : 0)
+  }
+
   const closeData = curve.map((d: any) => (d.close != null ? d.close : null))
 
   const initialCapital = equityData.length > 0 ? equityData[0] : 100_000

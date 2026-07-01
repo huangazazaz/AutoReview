@@ -157,6 +157,7 @@ export interface PortfolioBacktestResponse {
   trade_count: number
   output_dir: string
   trades?: PortfolioTrade[]
+  equity_curve?: EquityPoint[]
   error?: string
 }
 

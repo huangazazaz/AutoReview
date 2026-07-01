@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import CreatableSelect from 'react-select/creatable'
 import { useApp } from '@/hooks/useApp'
 import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { useCachedStrategies } from '@/hooks/useCachedStrategies'
 import { useCachedGroups } from '@/hooks/useCachedGroups'
+import { useECharts } from '@/hooks/useECharts'
 import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
@@ -293,6 +294,75 @@ export default function Portfolio() {
 const thStyle: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', borderBottom: '2px solid var(--border)', fontWeight: 600, whiteSpace: 'nowrap' }
 const tdStyle: React.CSSProperties = { padding: '6px 12px' }
 
+function PortfolioEquityChart({ curve, trades }: {
+  curve: { date: string; equity: number }[]
+  trades?: PortfolioTrade[]
+}) {
+  const chartRef = useRef<HTMLDivElement>(null!)
+  const dates = curve.map(d => d.date)
+  const equityData = curve.map(d => d.equity)
+
+  // Compute running drawdown
+  const drawdownData: number[] = []
+  let peak = -Infinity
+  for (const eq of equityData) {
+    if (eq > peak) peak = eq
+    drawdownData.push(peak > 0 ? (eq - peak) / peak * 100 : 0)
+  }
+
+  // Buy / Sell markers
+  const buyPoints: [string, number][] = []
+  const sellPoints: [string, number][] = []
+  if (trades) {
+    for (const t of trades) {
+      const idx = dates.indexOf(t.sell_date)
+      if (idx < 0) continue
+      if (t.pnl >= 0) {
+        buyPoints.push([t.sell_date, equityData[idx]])
+      } else {
+        sellPoints.push([t.sell_date, equityData[idx]])
+      }
+    }
+  }
+
+  const option = useMemo(() => ({
+    backgroundColor: '#1E293B',
+    title: { text: '权益曲线', left: 'center', top: 8, textStyle: { color: '#E2E8F0', fontSize: 15 } },
+    tooltip: { trigger: 'axis' as const },
+    legend: { data: ['权益', '回撤', '盈利', '亏损'], bottom: 0, textStyle: { color: '#94A3B8', fontSize: 11 } },
+    grid: { top: 50, bottom: 40, left: 70, right: 20 },
+    xAxis: { type: 'category' as const, data: dates, axisLabel: { color: '#94A3B8', fontSize: 9, rotate: 45 },
+      axisLine: { lineStyle: { color: '#334155' } } },
+    yAxis: [
+      { type: 'value' as const, name: '权益', nameTextStyle: { color: '#94A3B8', fontSize: 10 },
+        axisLabel: { color: '#94A3B8', fontSize: 9, formatter: (v: number) => (v / 10000).toFixed(0) + '万' } },
+      { type: 'value' as const, name: '回撤%', nameTextStyle: { color: '#94A3B8', fontSize: 10 },
+        axisLabel: { color: '#94A3B8', fontSize: 9 } },
+    ],
+    series: [
+      { name: '权益', type: 'line', data: equityData, smooth: true,
+        lineStyle: { color: '#3B82F6', width: 2 }, itemStyle: { color: '#3B82F6' },
+        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [{ offset: 0, color: 'rgba(59,130,246,0.2)' }, { offset: 1, color: 'rgba(59,130,246,0)' }] } } },
+      { name: '回撤', type: 'line', yAxisIndex: 1, data: drawdownData,
+        lineStyle: { color: '#EF4444', width: 1, type: 'dashed' as const },
+        itemStyle: { color: '#EF4444' } },
+      { name: '盈利', type: 'scatter', data: buyPoints, symbolSize: 8,
+        itemStyle: { color: '#22C55E' } },
+      { name: '亏损', type: 'scatter', data: sellPoints, symbolSize: 8,
+        itemStyle: { color: '#EF4444' } },
+    ],
+  }), [dates, equityData, drawdownData, buyPoints, sellPoints])
+
+  useECharts(chartRef, option, [option])
+
+  return (
+    <div className="card card-accent" style={{ marginTop: 16 }}>
+      <div ref={chartRef} style={{ width: '100%', height: 360 }} />
+    </div>
+  )
+}
+
 function PortfolioResult({ result, screener, strategy }: {
   result: PortfolioBacktestResponse
   screener: string
@@ -352,6 +422,10 @@ function PortfolioResult({ result, screener, strategy }: {
           <div className="stat-sub">{m.total_trades} 笔交易</div>
         </div>
       </div>
+
+      {result.equity_curve && result.equity_curve.length > 0 && (
+        <PortfolioEquityChart curve={result.equity_curve} trades={result.trades} />
+      )}
 
       <div className="card card-accent" style={{ marginTop: 16, borderTop: '2px solid rgba(59,130,246,0.3)' }}>
         <div className="card-header">

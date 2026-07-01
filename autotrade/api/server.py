@@ -294,6 +294,7 @@ def api_portfolio_backtest(req: PortfolioBacktestRequest):
         "trade_count": result.get("trade_count", 0),
         "output_dir": result.get("output_dir", ""),
         "trades": trades_list,
+        "equity_curve": _serialize_equity_curve(result.get("equity_curve")),
     }
 
 
@@ -935,6 +936,22 @@ def health():
 
 
 # ---- 工具函数 ----
+
+def _serialize_equity_curve(equity_curve) -> list[dict]:
+    """Convert a pandas Series (date index, equity values) to JSON-serializable list."""
+    if equity_curve is None:
+        return []
+    try:
+        import pandas as pd
+        if isinstance(equity_curve, pd.Series) and not equity_curve.empty:
+            return [
+                {"date": str(idx), "equity": round(float(val), 2)}
+                for idx, val in equity_curve.items()
+            ]
+    except Exception:
+        pass
+    return []
+
 
 def _resolve_dates(start_str, end_str, period_str):
     """解析日期：显式日期 > period > 默认1年。"""

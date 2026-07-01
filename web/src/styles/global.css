@@ -356,11 +356,17 @@ a:hover { color: var(--accent-hover); }
 .main-content {
     flex: 1;
     margin-left: var(--sidebar-width);
-    padding: var(--space-8) var(--space-8);
     min-height: 100vh;
     min-height: 100dvh;
-    max-width: 1280px;
+    display: flex;
+    justify-content: center;
+    padding: var(--space-8);
+}
+
+/* 内容居中包裹层：控制最大阅读宽度 */
+.content-wrapper {
     width: 100%;
+    max-width: 1280px;
 }
 
 /* ---- 页面标题 ---- */
@@ -1650,6 +1656,14 @@ code {
     .main-content { padding: var(--space-3); }
     .page-header { margin-bottom: var(--space-4); }
     .btn { padding: 8px 16px; }
+}
+
+/* ---- 宽屏：适度放宽内容宽度，避免两侧留白过大 ---- */
+@media (min-width: 1600px) {
+    .content-wrapper { max-width: 1400px; }
+}
+@media (min-width: 2000px) {
+    .content-wrapper { max-width: 1600px; }
 }
 
 /* ============================================================

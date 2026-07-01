@@ -38,7 +38,9 @@ export default function Layout() {
         tabIndex={-1}
         onClick={mobileOpen ? handleClose : undefined}
       >
-        <Outlet />
+        <div className="content-wrapper">
+          <Outlet />
+        </div>
       </main>
     </>
   )

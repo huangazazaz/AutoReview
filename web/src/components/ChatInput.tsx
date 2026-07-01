@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, type KeyboardEvent } from 'react'
+import { MAX_DATE } from '@/utils/date'
 
 interface ChatInputProps {
   symbol: string
@@ -119,13 +120,13 @@ export default function ChatInput({
               placeholder="代码" title="股票代码" />
           </div>
           <div className="form-group" style={{ margin: 0 }}>
-            <input type="date" className="form-input"
+            <input type="date" className="form-input" max={MAX_DATE}
               style={{ width: 120, padding: '8px 10px', fontSize: 13 }}
               value={startDate} onChange={e => onStartDateChange(e.target.value)}
               title="开始日期" />
           </div>
           <div className="form-group" style={{ margin: 0 }}>
-            <input type="date" className="form-input"
+            <input type="date" className="form-input" max={MAX_DATE}
               style={{ width: 120, padding: '8px 10px', fontSize: 13 }}
               value={endDate} onChange={e => onEndDateChange(e.target.value)}
               title="结束日期" />

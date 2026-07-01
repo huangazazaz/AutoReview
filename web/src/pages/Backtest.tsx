@@ -9,6 +9,7 @@ import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, escapeHtml } from '@/utils/format'
+import { MAX_DATE } from '@/utils/date'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 import type { StrategyInfo, BacktestSummary, BacktestResultItem } from '@/types'
@@ -30,9 +31,8 @@ const PERIODS = [
 ]
 
 function getPeriodDates(period: string): { start: string; end: string } {
-  const now = new Date()
-  const end = now.toISOString().slice(0, 10)
-  const d = new Date()
+  const end = MAX_DATE
+  const d = new Date(end)
   switch (period) {
     case '1M': d.setMonth(d.getMonth() - 1); break
     case '3M': d.setMonth(d.getMonth() - 3); break
@@ -642,6 +642,7 @@ const Backtest = () => {
                 <input
                   id="start-date"
                   type="date"
+                  max={MAX_DATE}
                   className="form-input date-input"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
@@ -655,6 +656,7 @@ const Backtest = () => {
                 <input
                   id="end-date"
                   type="date"
+                  max={MAX_DATE}
                   className="form-input date-input"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}

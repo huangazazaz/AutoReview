@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/UI'
 import ChatMessages from '@/components/ChatMessages'
 import ChatSessionList from '@/components/ChatSessionList'
 import ChatInput from '@/components/ChatInput'
+import { MAX_DATE } from '@/utils/date'
 import type { ChatMessage, ChatSession, StrategyResult } from '@/types'
 
 export default function AIStrategy() {
@@ -31,13 +32,12 @@ export default function AIStrategy() {
     }
   }, [])
 
-  // 默认日期：最近1年
+  // 默认日期：最近1年（数据截止 MAX_DATE）
   useEffect(() => {
-    const now = new Date()
-    const d = new Date()
+    const d = new Date(MAX_DATE)
     d.setFullYear(d.getFullYear() - 1)
     setStartDate(d.toISOString().slice(0, 10))
-    setEndDate(now.toISOString().slice(0, 10))
+    setEndDate(MAX_DATE)
   }, [])
 
   const loadSession = useCallback(async (sessionId: string) => {

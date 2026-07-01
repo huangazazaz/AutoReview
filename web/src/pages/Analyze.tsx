@@ -7,6 +7,7 @@ import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState, TrendIndicator } from '@/components/UI'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
+import { MAX_DATE } from '@/utils/date'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 import type { AnalyzeResult, Bar, Trade } from '@/types'
@@ -44,11 +45,10 @@ const REASON_TAG_MAP: Record<string, string> = {
    ─────────────────────────────────────────────────────────────────────────── */
 
 function getPeriodDates(period: string): { start: string; end: string } {
-  const now = new Date()
-  const end = now.toISOString().slice(0, 10)
+  const end = MAX_DATE
   if (period === '60t') return { start: '', end: '' }
 
-  const d = new Date()
+  const d = new Date(end)
   switch (period) {
     case '1y':  d.setFullYear(d.getFullYear() - 1); break
     case '6m':  d.setMonth(d.getMonth() - 6);       break
@@ -537,6 +537,7 @@ export default function Analyze() {
                 id="analyze-start"
                 className="form-input date-input"
                 type="date"
+                max={MAX_DATE}
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
               />
@@ -550,6 +551,7 @@ export default function Analyze() {
                 id="analyze-end"
                 className="form-input date-input"
                 type="date"
+                max={MAX_DATE}
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
               />

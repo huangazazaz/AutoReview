@@ -8,6 +8,7 @@ import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import DateRangeInput from '@/components/DateRangeInput'
 import { formatNumber, formatPct, formatAmount } from '@/utils/format'
+import { MAX_DATE } from '@/utils/date'
 import type { PortfolioBacktestResponse } from '@/types'
 
 export default function Portfolio() {
@@ -39,11 +40,10 @@ export default function Portfolio() {
 
   // 默认日期：最近1年
   useEffect(() => {
-    const now = new Date()
-    const d = new Date()
+    const d = new Date(MAX_DATE)
     d.setFullYear(d.getFullYear() - 1)
     setStartDate(d.toISOString().slice(0, 10))
-    setEndDate(now.toISOString().slice(0, 10))
+    setEndDate(MAX_DATE)
   }, [])
 
   useEffect(() => {
@@ -225,7 +225,7 @@ export default function Portfolio() {
             )}
             <div className="form-group" style={{ minWidth: 280 }}>
               <label className="form-label">日期范围</label>
-              <DateRangeInput startDate={startDate} endDate={endDate}
+              <DateRangeInput startDate={startDate} endDate={endDate} max={MAX_DATE}
                 onChange={(s, e) => { setStartDate(s); setEndDate(e) }} />
             </div>
             <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>

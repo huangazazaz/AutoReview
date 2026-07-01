@@ -5,6 +5,7 @@ import { useCachedStocks } from '@/hooks/useCachedStocks'
 import { api } from '@/api/client'
 import { PageHero, PageHeader, EmptyState } from '@/components/UI'
 import { formatNumber, formatPct, formatAmount, formatVolume, escapeHtml } from '@/utils/format'
+import { MAX_DATE } from '@/utils/date'
 import type { BarsResponse, Bar } from '@/types'
 import type { EChartsOption } from 'echarts'
 
@@ -435,6 +436,7 @@ function Bars() {
                   id="bars-start"
                   className="form-input date-input"
                   type="date"
+                  max={MAX_DATE}
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                 />
@@ -448,6 +450,7 @@ function Bars() {
                   id="bars-end"
                   className="form-input date-input"
                   type="date"
+                  max={MAX_DATE}
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                 />

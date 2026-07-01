@@ -153,6 +153,12 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* React 挂载点：作为 body 的 flex 子元素需撑满剩余空间 */
+#root {
+    flex: 1;
+    min-width: 0;
+}
+
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
 

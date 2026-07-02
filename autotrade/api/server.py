@@ -410,6 +410,7 @@ def _run_inline_backtest(
 
 def _sse(data: dict) -> str:
     """Format a dict as an SSE event line."""
+    import json
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 

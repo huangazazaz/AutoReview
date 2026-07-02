@@ -252,10 +252,33 @@ def _make_backtest_config() -> BacktestConfig:
 
 
 def _instantiate_strategy(strategy_cls: type, params: Optional[dict] = None) -> Strategy:
-    """实例化策略，应用参数。"""
-    if params:
-        return strategy_cls(**params)
-    return strategy_cls()
+    """实例化策略，自动将字符串参数转为正确类型。"""
+    if not params:
+        return strategy_cls()
+    # Coerce string values to proper types based on __init__ annotations
+    import inspect
+    sig = inspect.signature(strategy_cls.__init__)
+    coerced = {}
+    for key, val in params.items():
+        if key in sig.parameters:
+            ann = sig.parameters[key].annotation
+            if ann is not inspect.Parameter.empty:
+                try:
+                    if ann is float or ann == "float":
+                        coerced[key] = float(val)
+                    elif ann is int or ann == "int":
+                        coerced[key] = int(val)
+                    elif ann is bool or ann == "bool":
+                        coerced[key] = str(val).lower() in ("true", "1", "yes")
+                    else:
+                        coerced[key] = val
+                except (ValueError, TypeError):
+                    coerced[key] = val  # keep original on conversion failure
+            else:
+                coerced[key] = val
+        else:
+            coerced[key] = val
+    return strategy_cls(**coerced)
 
 
 def _summarize(results: list[BacktestResult]) -> dict[str, Any]:

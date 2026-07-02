@@ -38,7 +38,7 @@ STRATEGY_GEN_PROMPT = """你是一个量化策略工程师。根据用户的自�
 - from autotrade.indicators.rsi import RSI(period: int) → 列: ind_rsi_{{period}}
 - from autotrade.indicators.atr import ATR(period: int) → 列: ind_atr_{{period}}
 - from autotrade.indicators.macd import MACD(fast: int, slow: int, signal: int) → 列: ind_macd_macd, ind_macd_signal, ind_macd_histogram
-- from autotrade.indicators.bollinger import BollingerBands(period: int, std: float) → 列: ind_bb_lower_{{period}}_{{std}}, ind_bb_middle_{{period}}_{{std}}, ind_bb_upper_{{period}}_{{std}}
+- from autotrade.indicators.bollinger import BollingerBands(period: int, std: float) → 列: ind_bb_lower_{{period}}, ind_bb_middle_{{period}}, ind_bb_upper_{{period}}, ind_bb_width_{{period}}（注意列名仅含 period，不含 std！）
 
 重要: 所有列名都有 ind_ 前缀！例如 MA(5) 产生列 ind_ma_5，RSI(14) 产生列 ind_rsi_14。
 
@@ -89,7 +89,7 @@ CHAT_SYSTEM_PROMPT = """你是一个量化策略工程师，正在多轮对话�
 - from autotrade.indicators.rsi import RSI(period: int) → 列: ind_rsi_{{period}}
 - from autotrade.indicators.atr import ATR(period: int) → 列: ind_atr_{{period}}
 - from autotrade.indicators.macd import MACD(fast: int, slow: int, signal: int) → 列: ind_macd_macd, ind_macd_signal, ind_macd_histogram
-- from autotrade.indicators.bollinger import BollingerBands(period: int, std: float) → 列: ind_bb_lower_{{period}}_{{std}}, ind_bb_middle_{{period}}_{{std}}, ind_bb_upper_{{period}}_{{std}}
+- from autotrade.indicators.bollinger import BollingerBands(period: int, std: float) → 列: ind_bb_lower_{{period}}, ind_bb_middle_{{period}}, ind_bb_upper_{{period}}, ind_bb_width_{{period}}（注意列名仅含 period，不含 std！）
 
 重要: 所有列名都有 ind_ 前缀！例如 MA(5) 产生列 ind_ma_5，RSI(14) 产生列 ind_rsi_14。
 

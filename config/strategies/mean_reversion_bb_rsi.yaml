@@ -1,0 +1,7 @@
+strategy: mean_reversion_bb_rsi
+params:
+  bb_period: 20
+  bb_std: 2.0
+  rsi_period: 14
+  oversold: 30
+  overbought: 70

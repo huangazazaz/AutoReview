@@ -1,7 +1,7 @@
 # 🧪 BacktestLab — A股量化回测系统
 
 > **AI 驱动的 A 股量化交易信号生成与回测平台**  
-> 一切皆插件 · 三层架构 · AI 策略生成 · 全栈 Web UI  
+> 一切皆插件 · 三层架构 · AI 策略生成 · JWT 鉴权 · 智能选股 · 全栈 Web UI  
 > 🌐 **在线地址：[http://39.106.56.174:8080](http://39.106.56.174:8080)**
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)](https://www.python.org/)
@@ -46,11 +46,13 @@
 ## 核心特性
 
 ### 🧩 全面插件化
+
 - **5 类插件接口**：DataSource、Indicator、Strategy、Screener、Reporter
 - 添加新策略只需在对应目录放入 Python 文件，系统自动发现
 - 回测引擎为唯一不可插件的硬约束（A 股规则固定）
 
 ### 📊 完整回测引擎
+
 - **T+1 制度**（买入当日不可卖出）
 - **真实成本模拟**：佣金 0.03%、印花税 0.1%（卖出）、滑点 0.1%
 - **灵活仓位**：按信号强度分批（strength）或全仓（full）
@@ -58,30 +60,51 @@
 - **成交价可配**：次日开盘价（避免前视偏差）/ 当日收盘价
 
 ### 🎯 组合级回测
+
 - 多标的同步持仓模拟（最多 3 个同时持仓）
 - **市场环境感知**：根据筛选器候选质量动态调整持仓数
 - **四维出场规则**：移动止损、硬止损、时间止损、信号衰减
 - 实盘级资金管理：现金缓冲、每日买卖计划
+- **权益曲线可视化**：ECharts 交互式权益曲线 + 回撤图 + 交易标记
+- **交易明细表**：完整的买卖记录，含触发原因标注
+
+### 🔍 智能选股
+
+- **选股器 + 策略买点确认**：先海选候选标的，再用策略确认买点信号
+- **因子透明化**：每只股票展示逐因子评分明细
+- **排序与筛选**：按评分排序，一键过滤"有买点"股票
+- **关键指标速览**：股价、成交量、成交额、均线一览
+
+### 🔐 JWT 鉴权
+
+- 用户注册 / 登录系统
+- PBKDF2-HMAC-SHA256 密码哈希
+- 7 天 JWT Token 有效期
+- 受保护路由 + 自动过期检测
 
 ### 🤖 AI 驱动
+
 - **自然语言生成策略**：用中文描述交易想法，AI（DeepSeek）自动生成完整 Python 策略代码 + YAML 配置
 - **多轮对话优化**：通过聊天界面与 AI 反复打磨策略参数
 - **即时回测验证**：AI 生成的策略自动运行回测，立刻看到效果
 - **AI 筛选增强**：TradingAgents 多智能体 LLM 辅助筛选标的
 
 ### 🎨 全栈 Web UI
+
 - **React + TypeScript SPA**：现代化前端架构，组件化设计
-- **ECharts 交互图表**：K 线图、权益曲线、回撤图、排行榜
+- **ECharts 交互图表**：K 线图、权益曲线、回撤图、排行榜、组合权益图
 - **暗色金融主题**：CSS 变量驱动的设计系统
 - **响应式布局**：桌面/平板/手机自适应
-- **7 个功能页面**：仪表盘、单股分析、批量回测、组合回测、AI 策略、K 线查询、分组管理
+- **代码分割**：React.lazy 按页面懒加载，首屏秒开
+- **9 个功能页面**：仪表盘、智能选股、单股分析、批量回测、组合回测、AI 策略、K 线查询、分组管理、策略管理
 
 ### 🔧 多触发方式
-| 触发方式 | 入口 | 适用场景 |
-|---------|------|---------|
-| Web API | `start.bat` / `start.sh` | 日常交互使用 |
-| CLI | `cli.bat` / `python -m autotrade.triggers.cli` | 快速命令行分析 |
-| 定时调度 | APScheduler | 收盘后自动扫描 |
+
+| 触发方式 | 入口                                           | 适用场景       |
+| -------- | ---------------------------------------------- | -------------- |
+| Web API  | `start.bat` / `start.sh`                       | 日常交互使用   |
+| CLI      | `cli.bat` / `python -m autotrade.triggers.cli` | 快速命令行分析 |
+| 定时调度 | APScheduler                                    | 收盘后自动扫描 |
 
 ---
 
@@ -96,6 +119,7 @@
 ┌──────────────────────────▼──────────────────────────────────┐
 │  编排层 (Orchestration)  — 纯组装调度，不含业务逻辑             │
 │  analyze_stock()  │  run_backtest()  │  run_portfolio_backtest()│
+│  run_screen()    │  run_screener_backtest()                    │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
@@ -114,12 +138,13 @@
 
 ### 设计原则
 
-| 原则 | 说明 |
-|------|------|
-| **一切皆插件** | DataSource / Indicator / Strategy / Screener / Reporter 均为 ABC 接口，通过文件系统自动发现 |
-| **触发-核心解耦** | CLI、调度器、Web API 都是平等的"调用方"，调用同一套核心 API |
-| **配置-代码分离** | 所有参数存于 YAML 文件，前端和 CLI 均可参数调优，无需改代码 |
-| **数据源主备降级** | 本地缓存 → Tushare（主力）→ AKShare（备用），自动 fallover |
+| 原则               | 说明                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| **一切皆插件**     | DataSource / Indicator / Strategy / Screener / Reporter 均为 ABC 接口，通过文件系统自动发现 |
+| **触发-核心解耦**  | CLI、调度器、Web API 都是平等的"调用方"，调用同一套核心 API                                 |
+| **配置-代码分离**  | 所有参数存于 YAML 文件，前端和 CLI 均可参数调优，无需改代码                                 |
+| **数据源主备降级** | 本地缓存 → Tushare（主力）→ AKShare（备用），自动 fallover                                  |
+| **JWT 无状态鉴权** | PBKDF2 密码哈希 + HS256 Token，7 天有效期，受保护路由                                       |
 
 ---
 
@@ -127,43 +152,43 @@
 
 ### 后端
 
-| 组件 | 技术 | 说明 |
-|------|------|------|
-| 语言 | Python 3.10+ | 类型注解、dataclasses |
+| 组件     | 技术              | 说明                  |
+| -------- | ----------------- | --------------------- |
+| 语言     | Python 3.10+      | 类型注解、dataclasses |
 | Web 框架 | FastAPI + Uvicorn | 自动生成 Swagger 文档 |
-| 数据处理 | pandas + numpy | 向量化计算 |
-| 数据存储 | PyArrow / Parquet | 本地 K 线缓存 |
-| CLI | Click | 命令行参数解析 |
-| 定时任务 | APScheduler | Cron 表达式调度 |
-| 终端美化 | Rich | 彩色表格输出 |
-| 图表 | matplotlib | 权益曲线/回撤图 |
-| 配置 | PyYAML | 策略参数、系统设置 |
+| 数据处理 | pandas + numpy    | 向量化计算            |
+| 数据存储 | PyArrow / Parquet | 本地 K 线缓存         |
+| CLI      | Click             | 命令行参数解析        |
+| 定时任务 | APScheduler       | Cron 表达式调度       |
+| 终端美化 | Rich              | 彩色表格输出          |
+| 图表     | matplotlib        | 权益曲线/回撤图       |
+| 配置     | PyYAML            | 策略参数、系统设置    |
 
 ### 前端
 
-| 组件 | 技术 | 说明 |
-|------|------|------|
-| 框架 | React 18 + TypeScript | 类型安全的 SPA |
-| 构建 | Vite 5 | 极速 HMR |
-| 路由 | React Router 6 | 客户端路由 |
-| 图表 | ECharts 5.5 | K 线/权益/回撤/排行 |
-| UI 组件 | react-select | 可搜索多选下拉框 |
-| 样式 | CSS Custom Properties | 暗色金融主题 |
+| 组件    | 技术                  | 说明                |
+| ------- | --------------------- | ------------------- |
+| 框架    | React 18 + TypeScript | 类型安全的 SPA      |
+| 构建    | Vite 5                | 极速 HMR            |
+| 路由    | React Router 6        | 客户端路由          |
+| 图表    | ECharts 5.5           | K 线/权益/回撤/排行 |
+| UI 组件 | react-select          | 可搜索多选下拉框    |
+| 样式    | CSS Custom Properties | 暗色金融主题        |
 
 ### AI
 
-| 组件 | 技术 | 说明 |
-|------|------|------|
+| 组件     | 技术                      | 说明                     |
+| -------- | ------------------------- | ------------------------ |
 | 策略生成 | DeepSeek API (OpenAI SDK) | 自然语言→Python 策略代码 |
-| 标的筛选 | TradingAgents | 多智能体 LLM 分析 |
+| 标的筛选 | TradingAgents             | 多智能体 LLM 分析        |
 
 ### 数据源
 
-| 数据源 | 类型 | 说明 |
-|------|------|------|
-| AKShare | 免费公开 | 东方财富数据，无需 token |
-| Tushare Pro | 专业付费 | 高质量数据，需注册 token |
-| 本地 Parquet | 缓存 | 从网络源自动缓存，加速重复查询 |
+| 数据源       | 类型     | 说明                           |
+| ------------ | -------- | ------------------------------ |
+| AKShare      | 免费公开 | 东方财富数据，无需 token       |
+| Tushare Pro  | 专业付费 | 高质量数据，需注册 token       |
+| 本地 Parquet | 缓存     | 从网络源自动缓存，加速重复查询 |
 
 ---
 
@@ -201,11 +226,13 @@ python scripts/download_stocks.py
 **Windows**：双击 `start.bat`
 
 **macOS / Linux**：
+
 ```bash
 ./start.sh
 ```
 
 启动后访问：
+
 - 🖥️ **Web 界面**：http://localhost:8080
 - 📚 **API 文档**：http://localhost:8080/docs
 - ❤️ **健康检查**：http://localhost:8080/health
@@ -265,14 +292,20 @@ AutoReview/
 │   │   ├── strategy_generator.py #     DeepSeek 策略代码生成
 │   │   ├── ai_filter.py          #     TradingAgents 标的筛选
 │   │   ├── session_store.py      #     聊天会话管理
+│   │   ├── local_ai_analyzer.py   #     本地数据 AI 分析（DeepSeek）
 │   │   └── llm_cache.py          #     LLM 响应缓存
+│   ├── auth/                      #   🔐 JWT 鉴权模块
+│   │   ├── auth.py                #     密码哈希 + Token 签发/验证
+│   │   ├── store.py               #     用户持久化存储（JSON）
+│   │   ├── routes.py              #     注册/登录/获取用户 API
+│   │   └── dependencies.py        #     FastAPI 鉴权依赖注入
 │   ├── triggers/                 #   触发入口
 │   │   ├── cli.py                #     Click CLI
 │   │   └── scheduler.py          #     APScheduler 定时任务
 │   └── registry.py               #   插件自动发现与注册
 ├── web/                          # ⚛️ React SPA 前端
 │   ├── src/
-│   │   ├── pages/                #     7 个页面组件
+│   │   ├── pages/                #     8 个页面组件
 │   │   ├── components/           #     共享组件（Sidebar/Layout/Chat/…）
 │   │   ├── api/                  #     API 客户端
 │   │   ├── hooks/                #     自定义 Hooks（useECharts/useApp）
@@ -310,8 +343,9 @@ AutoReview/
 ├── scripts/                      # 🔧 工具脚本
 │   ├── download_stocks.py        #     全市场数据下载
 │   ├── export_stock_list.py      #     股票列表导出
-│   ├── backtest_hot_money.py     #     热门资金策略验证
-│   └── run_portfolio_backtest.py #     组合回测启动
+│   ├── run_portfolio_backtest.py #     组合回测启动
+│   ├── run_ai_backtest.py        #     AI 增强组合回测（LocalAIAnalyzer）
+│   └── run_turtle_backtest.py    #     海龟策略批量回测
 ├── start.bat / start.sh          # 🚀 一键启动脚本
 ├── cli.bat                       # 💻 CLI 快捷入口
 └── README.md                     # 📖 本文件
@@ -323,22 +357,29 @@ AutoReview/
 
 ### REST API 端点
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| `GET` | `/health` | 健康检查 |
-| `POST` | `/analyze` | 单股回测分析（含完整交易记录和权益曲线） |
-| `POST` | `/backtest` | 批量回测（多股票/分组，返回排行榜） |
-| `POST` | `/portfolio-backtest` | 组合级回测（选股器+策略+资金管理） |
-| `POST` | `/bars` | 日线 OHLCV 数据查询 |
-| `GET` | `/strategies` | 列出所有策略及其参数 schema |
-| `GET` | `/datasources` | 列出可用数据源 |
-| `GET` | `/cache/stocks` | 本地缓存股票列表（分页） |
-| `GET/POST/PUT/DELETE` | `/groups[/{id}]` | 股票分组 CRUD |
-| `POST` | `/ai/generate-strategy` | AI 生成策略+自动回测 |
-| `POST` | `/ai/chat` | AI 多轮对话优化策略 |
-| `GET/DELETE` | `/ai/chat/{id}` | 聊天会话管理 |
-| `POST` | `/strategies/save` | 保存 AI 生成的策略到文件 |
-| `DELETE` | `/strategies/{name}` | 删除策略 |
+> 所有 API 端点统一使用 `/api` 前缀
+
+| 方法                  | 路径                        | 说明                                      |
+| --------------------- | --------------------------- | ----------------------------------------- |
+| `GET`                 | `/api/health`               | 健康检查                                  |
+| `POST`                | `/api/auth/register`        | 用户注册                                  |
+| `POST`                | `/api/auth/login`           | 用户登录（返回 JWT Token）                |
+| `GET`                 | `/api/auth/me`              | 获取当前用户信息                          |
+| `POST`                | `/api/analyze`              | 单股回测分析（含完整交易记录和权益曲线）  |
+| `POST`                | `/api/backtest`             | 批量回测（多股票/分组，返回排行榜）       |
+| `POST`                | `/api/portfolio-backtest`   | 组合级回测（选股器+策略+资金管理）        |
+| `POST`                | `/api/screen`               | 智能选股扫描（选股器海选 + 策略买点确认） |
+| `GET`                 | `/api/screeners`            | 列出可用选股器及其参数                    |
+| `POST`                | `/api/bars`                 | 日线 OHLCV 数据查询                       |
+| `GET`                 | `/api/strategies`           | 列出所有策略及其参数 schema               |
+| `GET`                 | `/api/datasources`          | 列出可用数据源                            |
+| `GET`                 | `/api/cache/stocks`         | 本地缓存股票列表（分页+搜索）             |
+| `GET/POST/PUT/DELETE` | `/api/groups[/{id}]`        | 股票分组 CRUD                             |
+| `POST`                | `/api/ai/generate-strategy` | AI 生成策略+自动回测                      |
+| `POST`                | `/api/ai/chat`              | AI 多轮对话优化策略                       |
+| `GET/DELETE`          | `/api/ai/chat/{id}`         | 聊天会话管理                              |
+| `POST`                | `/api/strategies/save`      | 保存 AI 生成的策略到文件                  |
+| `DELETE`              | `/api/strategies/{name}`    | 删除策略                                  |
 
 > 📚 完整 API 文档：启动服务后访问 `http://localhost:8080/docs`（Swagger UI）
 > 📄 详见：[docs/api.md](./docs/api.md)
@@ -347,17 +388,17 @@ AutoReview/
 
 ## 内置策略
 
-| 策略名 | 类型 | 核心逻辑 |
-|--------|------|---------|
-| `ma_cross` | 均线交叉 | MA 金叉买入，分批金字塔加仓，阶梯止盈，回撤规则 |
-| `macd_divergence` | MACD 背离 | 检测 MACD 与价格的顶底背离信号 |
-| `ma_cross_macd` | 均线+MACD | MA 金叉 + MACD 柱状图>0 动量确认 |
-| `golden_filter` | 多重过滤 | MA 交叉 + 放量 + RSI<70 + 收盘>布林中轨 |
-| `turtle` | 海龟交易 | 双通道突破（20/55 日），ATR 波动率仓位，N 止损 |
-| `trend_bb_rsi` | 趋势共振 | 布林趋势 + RSI 区域 + 量能确认 + MACD 动量，四维共振 |
-| `trend_ma_breakout` | 趋势突破 | MA 金叉 + RSI 甜点区（30-60）过滤 |
-| `hot_money` | 游资打板 | 筛选器驱动进场，四门出场（移动止损/时间/硬止损/趋势破位） |
-| `three_gap_up_buy` | 三跳空 | 连续 3 日跳空高开的强势追涨模式 |
+| 策略名              | 类型      | 核心逻辑                                                  |
+| ------------------- | --------- | --------------------------------------------------------- |
+| `ma_cross`          | 均线交叉  | MA 金叉买入，分批金字塔加仓，阶梯止盈，回撤规则           |
+| `macd_divergence`   | MACD 背离 | 检测 MACD 与价格的顶底背离信号                            |
+| `ma_cross_macd`     | 均线+MACD | MA 金叉 + MACD 柱状图>0 动量确认                          |
+| `golden_filter`     | 多重过滤  | MA 交叉 + 放量 + RSI<70 + 收盘>布林中轨                   |
+| `turtle`            | 海龟交易  | 双通道突破（20/55 日），ATR 波动率仓位，N 止损            |
+| `trend_bb_rsi`      | 趋势共振  | 布林趋势 + RSI 区域 + 量能确认 + MACD 动量，四维共振      |
+| `trend_ma_breakout` | 趋势突破  | MA 金叉 + RSI 甜点区（30-60）过滤                         |
+| `hot_money`         | 游资打板  | 筛选器驱动进场，四门出场（移动止损/时间/硬止损/趋势破位） |
+| `three_gap_up_buy`  | 三跳空    | 连续 3 日跳空高开的强势追涨模式                           |
 
 ---
 
@@ -395,13 +436,13 @@ class MyStrategy(Strategy):
 
 ### 插件接口一览
 
-| 接口 | 核心方法 | 自动发现目录 |
-|------|---------|-------------|
-| `DataSource` | `get_bars(symbol, start, end)` | `autotrade/dataSources/` |
-| `Indicator` | `compute(df) -> DataFrame` | `autotrade/indicators/` |
-| `Strategy` | `generate_signals(df) -> list[Signal]` | `autotrade/strategies/` |
-| `Screener` | `scan(market_data, dates) -> dict` | `autotrade/screens/` |
-| `Reporter` | `render(result: BacktestResult)` | `autotrade/reporters/` |
+| 接口         | 核心方法                               | 自动发现目录             |
+| ------------ | -------------------------------------- | ------------------------ |
+| `DataSource` | `get_bars(symbol, start, end)`         | `autotrade/dataSources/` |
+| `Indicator`  | `compute(df) -> DataFrame`             | `autotrade/indicators/`  |
+| `Strategy`   | `generate_signals(df) -> list[Signal]` | `autotrade/strategies/`  |
+| `Screener`   | `scan(market_data, dates) -> dict`     | `autotrade/screens/`     |
+| `Reporter`   | `render(result: BacktestResult)`       | `autotrade/reporters/`   |
 
 ---
 
@@ -417,11 +458,13 @@ class MyStrategy(Strategy):
 4. 📊 即时展示回测结果
 
 **示例提示词**：
+
 > "当 5 日均线上穿 20 日均线，且成交量大于前 5 日均量的 1.5 倍时买入，跌破 10 日均线时卖出"
 
 ### 多轮对话打磨
 
 通过聊天界面与 AI 反复优化策略，例如：
+
 - "把止损从 5% 改成 8%"
 - "增加一个 RSI < 30 的买入条件"
 - "回测一下最近一年的效果"
@@ -434,17 +477,17 @@ class MyStrategy(Strategy):
 
 ## 文档索引
 
-| 文档 | 说明 |
-|------|------|
-| [README.md](./README.md) | 项目总览（本文件） |
-| [USER_GUIDE.md](./USER_GUIDE.md) | 用户使用手册 |
-| [VIBECODING.md](./VIBECODING.md) | Vibecoding 开发全流程记录 |
-| [docs/api.md](./docs/api.md) | REST API 完整参考 |
-| [docs/backend-startup.md](./docs/backend-startup.md) | 后端启动与配置指南 |
-| [docs/frontend.md](./docs/frontend.md) | 前端架构文档 |
-| [docs/decisions/](./docs/decisions/) | 架构决策记录（ADR） |
-| [docs/superpowers/specs/](./docs/superpowers/specs/) | 设计规约文档 |
-| [docs/superpowers/plans/](./docs/superpowers/plans/) | 实现计划文档 |
+| 文档                                                 | 说明                      |
+| ---------------------------------------------------- | ------------------------- |
+| [README.md](./README.md)                             | 项目总览（本文件）        |
+| [USER_GUIDE.md](./USER_GUIDE.md)                     | 用户使用手册              |
+| [VIBECODING.md](./VIBECODING.md)                     | Vibecoding 开发全流程记录 |
+| [docs/api.md](./docs/api.md)                         | REST API 完整参考         |
+| [docs/backend-startup.md](./docs/backend-startup.md) | 后端启动与配置指南        |
+| [docs/frontend.md](./docs/frontend.md)               | 前端架构文档              |
+| [docs/decisions/](./docs/decisions/)                 | 架构决策记录（ADR）       |
+| [docs/superpowers/specs/](./docs/superpowers/specs/) | 设计规约文档              |
+| [docs/superpowers/plans/](./docs/superpowers/plans/) | 实现计划文档              |
 
 ---
 
@@ -460,11 +503,14 @@ class MyStrategy(Strategy):
 - [x] AI 策略生成：DeepSeek 自然语言 → Python 代码
 - [x] React SPA 重写：TypeScript + React Router + ECharts
 - [x] AI 多轮对话：策略聊天优化界面
+- [x] JWT 鉴权：注册/登录 + 受保护路由
+- [x] 智能选股：选股器海选 + 策略买点确认 + 因子透明化
+- [x] 组合回测增强：权益曲线图表 + 交易明细表
+- [x] 性能优化：代码分割、GZip、缓存 Hooks、搜索防抖
 - [ ] 分钟级数据支持
-- [ ] 更多策略模板（网格、套利）
 - [ ] 策略参数优化（遗传算法/网格搜索）
 - [ ] Docker 一键部署
-- [ ] 实盘信号推送（企业微信/钉钉）
+- [ ] 实盘信号推送
 
 ---
 

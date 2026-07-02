@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '@/hooks/useApp'
 import { useCachedStrategies } from '@/hooks/useCachedStrategies'
 import { api } from '@/api/client'
+import { MAX_DATE } from '@/utils/date'
 import ScreenerParamsEditor from '@/components/ScreenerParamsEditor'
 import StrategyParamsEditor from '@/components/StrategyParamsEditor'
 import type { ScreenerInfo, ScreenResult, StrategyInfo } from '@/types'
@@ -56,10 +57,10 @@ export default function Screener() {
     }).catch(() => {})
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Set default date to today
+  // Set default date to MAX_DATE
   useEffect(() => {
     if (!date) {
-      setDate(new Date().toISOString().slice(0, 10))
+      setDate(MAX_DATE)
     }
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -174,7 +175,7 @@ export default function Screener() {
                 type="date"
                 className="form-input"
                 value={date}
-                max={new Date().toISOString().slice(0, 10)}
+                max={MAX_DATE}
                 onChange={e => setDate(e.target.value)}
               />
             </div>

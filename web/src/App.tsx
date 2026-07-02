@@ -14,6 +14,7 @@ const AIStrategy = lazy(() => import('@/pages/AIStrategy'))
 const Bars = lazy(() => import('@/pages/Bars'))
 const Groups = lazy(() => import('@/pages/Groups'))
 const Screener = lazy(() => import('@/pages/Screener'))
+const StrategyManage = lazy(() => import('@/pages/StrategyManage'))
 
 function PageLoader() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/ai-strategy" element={<Suspense fallback={<PageLoader />}><AIStrategy /></Suspense>} />
           <Route path="/bars" element={<Suspense fallback={<PageLoader />}><Bars /></Suspense>} />
           <Route path="/groups" element={<Suspense fallback={<PageLoader />}><Groups /></Suspense>} />
+          <Route path="/strategies" element={<Suspense fallback={<PageLoader />}><StrategyManage /></Suspense>} />
         </Route>
       </Route>
     </Routes>

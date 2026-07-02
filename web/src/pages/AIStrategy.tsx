@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useApp } from '@/hooks/useApp'
+import { useCachedStrategies } from '@/hooks/useCachedStrategies'
 import { api } from '@/api/client'
 import { PageHeader } from '@/components/UI'
 import ChatMessages from '@/components/ChatMessages'
@@ -10,6 +11,7 @@ import type { ChatMessage, ChatSession, StrategyResult } from '@/types'
 
 export default function AIStrategy() {
   const { showToast, showLoading: showGlobalLoading, hideLoading } = useApp()
+  const { refresh: refreshStrategies } = useCachedStrategies()
 
   const [symbol, setSymbol] = useState('600522')
   const [startDate, setStartDate] = useState('')
@@ -168,22 +170,28 @@ export default function AIStrategy() {
         yaml_code: strategy.yaml_code,
       })
       if (res.error) showToast(res.error, 'error')
-      else showToast(`策略 ${res.name} 已保存`, 'info')
+      else {
+        showToast(`策略 ${res.name} 已保存`, 'info')
+        refreshStrategies()
+      }
     } catch (err) {
       showToast('保存失败: ' + (err as Error).message, 'error')
     } finally { hideLoading() }
-  }, [])
+  }, [refreshStrategies])
 
   const handleDelete = useCallback(async (name: string) => {
     showGlobalLoading('正在删除策略...')
     try {
       const res = await api.deleteStrategy(name)
       if (res.error) showToast(res.error, 'error')
-      else showToast(`策略 ${res.name} 已删除`, 'info')
+      else {
+        showToast(`策略 ${res.name} 已删除`, 'info')
+        refreshStrategies()
+      }
     } catch (err) {
       showToast('删除失败: ' + (err as Error).message, 'error')
     } finally { hideLoading() }
-  }, [])
+  }, [refreshStrategies])
 
   const handleCodeExpand = useCallback((messageId: number) => {
     setMessages(prev => prev.map(m =>

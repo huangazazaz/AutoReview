@@ -25,12 +25,15 @@ STRATEGY_GEN_PROMPT = """你是一个量化策略工程师。根据用户的自�
 }}
 
 策略 Python 类必须遵循以下接口：
-- 继承自 autotrade.core.interfaces.Strategy
+- from autotrade.core.interfaces import Strategy  # 基类
+- from autotrade.core.models import Signal        # 信号类
 - 必须设置 name 属性（与策略名一致）
 - required_indicators 声明所需指标（使用 autotrade.indicators 下的类）
 - 实现 generate_signals(self, df: pd.DataFrame) -> list[Signal] 方法
   - df 的 index 是 date，包含 open/high/low/close/volume 列 + 指标列
   - 返回 Signal(symbol="", date=date, action="BUY"/"SELL", strength=0.0~1.0, reason="说明")
+- __init__ 中不要调用 super().__init__()，直接设置 self.xxx 即可
+- 所有 __init__ 参数必须有默认值，否则注册时无法自动发现
 
 可用的指标类（导入路径 → 类名 → 输出列）:
 - from autotrade.indicators.ma import MA(period: int) → 列: ind_ma_{{period}}
@@ -76,12 +79,15 @@ CHAT_SYSTEM_PROMPT = """你是一个量化策略工程师，正在多轮对话�
 }}
 
 策略 Python 类必须遵循以下接口:
-- 继承自 autotrade.core.interfaces.Strategy
+- from autotrade.core.interfaces import Strategy  # 基类
+- from autotrade.core.models import Signal        # 信号类
 - 必须设置 name 属性（与策略名一致）
 - required_indicators 声明所需指标（使用 autotrade.indicators 下的类）
 - 实现 generate_signals(self, df: pd.DataFrame) -> list[Signal] 方法
   - df 的 index 是 date，包含 open/high/low/close/volume 列 + 指标列
   - 返回 Signal(symbol="", date=date, action="BUY"/"SELL", strength=0.0~1.0, reason="说明")
+- __init__ 中不要调用 super().__init__()，直接设置 self.xxx 即可
+- 所有 __init__ 参数必须有默认值，否则注册时无法自动发现
 
 可用的指标类（导入路径 → 类名 → 输出列）:
 - from autotrade.indicators.ma import MA(period: int) → 列: ind_ma_{{period}}

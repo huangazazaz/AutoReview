@@ -387,7 +387,8 @@ def api_generate_strategy(req: GenerateStrategyRequest):
         ds = build_datasource_from_name("failover")
         bars = ds.get_bars(req.symbol, s, e)
         if not bars:
-            logger.warning("No bar data for %s", req.symbol)
+            logger.warning("No bar data for %s in %s ~ %s", req.symbol, s, e)
+            backtest_result = {"error": f"未找到 {req.symbol} 在 {s} ~ {e} 的数据，请尝试其他股票代码或时间范围"}
         else:
             df = _bars_to_dataframe(bars)
             for ind in strategy.required_indicators:
@@ -537,6 +538,9 @@ def api_chat(req: ChatRequest):
 
             ds = build_datasource_from_name("failover")
             bars = ds.get_bars(req.symbol, s, e)
+            if not bars:
+                logger.warning("No bar data for %s in %s ~ %s", req.symbol, s, e)
+                backtest_result = {"error": f"未找到 {req.symbol} 在 {s} ~ {e} 的数据，请尝试其他股票代码或时间范围"}
             if bars:
                 df = _bars_to_dataframe(bars)
                 for ind in strategy.required_indicators:
@@ -656,6 +660,16 @@ def api_save_strategy(req: SaveStrategyRequest):
         f.write(req.yaml_code)
 
     reload_registry(force=True)
+
+    # Verify strategy registered successfully (check for import/syntax errors)
+    from autotrade.registry import get_strategy
+    try:
+        get_strategy(req.name)
+    except ValueError as e:
+        # Roll back — delete the saved files
+        py_path.unlink(missing_ok=True)
+        yaml_path.unlink(missing_ok=True)
+        return {"error": f"策略保存成功但无法加载: {e}。请检查代码是否有语法错误或缺失导入。"}
 
     return {
         "success": True,

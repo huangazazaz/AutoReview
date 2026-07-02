@@ -811,8 +811,7 @@ def api_save_strategy(req: SaveStrategyRequest):
 
 @api_router.delete("/strategies/{name}")
 def api_delete_strategy(name: str):
-    """删除 AI 生成的策略。内置策略不可删除。"""
-    from autotrade.ai.strategy_generator import StrategyGenerator
+    """删除 AI 生成的策略（按注册名或文件名匹配）。内置策略不可删除。"""
     from autotrade.registry import init_registry as reload_registry
 
     if is_builtin_strategy(name):
@@ -821,14 +820,37 @@ def api_delete_strategy(name: str):
     py_path = Path(__file__).resolve().parent.parent / "strategies" / f"{name}.py"
     yaml_path = Path(__file__).resolve().parent.parent.parent / "config" / "strategies" / f"{name}.yaml"
 
+    # If exact filename doesn't exist, scan for files whose registered name matches
+    if not py_path.exists():
+        strategies_dir = py_path.parent
+        for f in strategies_dir.glob("*.py"):
+            if f.stem in ("__init__",):
+                continue
+            # Check if this file registers under the requested name
+            try:
+                import importlib, sys
+                modname = f"autotrade.strategies.{f.stem}"
+                if modname in sys.modules:
+                    del sys.modules[modname]
+                module = importlib.import_module(modname)
+                from autotrade.core.interfaces import Strategy
+                for attr_name in dir(module):
+                    obj = getattr(module, attr_name)
+                    if (isinstance(obj, type) and issubclass(obj, Strategy)
+                            and getattr(obj, "name", "") == name):
+                        py_path = f
+                        yaml_path = Path(str(f).replace("/strategies/", "/../config/strategies/").replace(".py", ".yaml")).resolve()
+                        break
+            except Exception:
+                continue
+        if not py_path.exists():
+            return {"error": f"策略 {name} 不存在"}
+
     deleted = []
     for p in [py_path, yaml_path]:
         if p.exists():
             p.unlink()
             deleted.append(str(p))
-
-    if not deleted:
-        return {"error": f"策略 {name} 不存在"}
 
     reload_registry(force=True)
 

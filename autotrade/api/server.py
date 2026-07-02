@@ -778,17 +778,18 @@ def api_save_strategy(req: SaveStrategyRequest):
             obj = getattr(module, attr_name)
             if (isinstance(obj, type) and issubclass(obj, Strategy)
                     and hasattr(obj, "name") and attr_name != "Strategy"):
-                register_strategy(obj.name, obj)
+                register_strategy(req.name, obj)  # use requested name
                 break
         else:
             raise ValueError("未在模块中找到策略类")
     except Exception as e:
         # Full rescan as fallback
+        logger.warning("Single-strategy registration failed for '%s', trying full rescan: %s", req.name, e)
         reload_registry(force=True)
         from autotrade.registry import get_strategy
         try:
             get_strategy(req.name)
-        except ValueError:
+        except (ValueError, KeyError):
             # Still not found — roll back
             py_path.unlink(missing_ok=True)
             yaml_path.unlink(missing_ok=True)

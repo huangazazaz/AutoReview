@@ -43,6 +43,7 @@ from fastapi import FastAPI, HTTPException, Query, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from autotrade.core.engine import analyze_stock, run_backtest, run_portfolio_backtest, run_screen
@@ -317,6 +318,101 @@ def _get_deepseek_api_key() -> Optional[str]:
     return os.environ.get("DEEPSEEK_API_KEY")
 
 
+def _run_inline_backtest(
+    strategy_code: str,
+    yaml_code: str,
+    symbol: str,
+    start: date,
+    end: date,
+) -> dict:
+    """动态加载 AI 生成的策略代码并运行回测。
+
+    Args:
+        strategy_code: AI 生成的 Python 策略类代码
+        yaml_code: AI 生成的 YAML 配置
+        symbol: 回测股票代码
+        start/end: 回测日期范围
+
+    Returns:
+        backtest 指标 dict（无错误时）或 {"error": str}
+    """
+    import yaml
+    from autotrade.core.engine import _bars_to_dataframe, _make_backtest_config
+    from autotrade.core.backtester import Backtester
+    from autotrade.core.datasource_factory import build_datasource_from_name
+
+    # 1. 动态加载策略类
+    spec = importlib.util.spec_from_loader("_ai_strategy", loader=None, origin="<ai>")
+    if spec is None:
+        return {"error": "Failed to create module spec"}
+    module = importlib.util.module_from_spec(spec)
+    exec(strategy_code, module.__dict__)
+
+    strat_class = None
+    for attr_name in dir(module):
+        obj = getattr(module, attr_name)
+        if (isinstance(obj, type)
+                and hasattr(obj, "generate_signals")
+                and hasattr(obj, "name")
+                and attr_name != "Strategy"):
+            strat_class = obj
+            break
+    if strat_class is None:
+        return {"error": "未在生成的代码中找到策略类"}
+
+    # 2. 实例化策略（三层回退）
+    try:
+        parsed_yaml = yaml.safe_load(yaml_code)
+        yaml_params = parsed_yaml.get("params", {}) if isinstance(parsed_yaml, dict) else {}
+    except Exception:
+        yaml_params = {}
+
+    strategy = None
+    try:
+        strategy = strat_class(**yaml_params)
+    except (TypeError, Exception):
+        try:
+            strategy = strat_class()
+        except Exception:
+            import inspect
+            sig_params = inspect.signature(strat_class.__init__).parameters
+            accepted = {k: v for k, v in yaml_params.items() if k in sig_params}
+            strategy = strat_class(**accepted) if accepted else strat_class()
+
+    # 3. 加载数据 + 运行回测
+    ds = build_datasource_from_name("failover")
+    bars = ds.get_bars(symbol, start, end)
+    if not bars:
+        return {"error": f"未找到 {symbol} 在 {start} ~ {end} 的数据"}
+
+    df = _bars_to_dataframe(bars)
+    for ind in strategy.required_indicators:
+        df = ind.compute(df)
+
+    raw_signals = strategy.generate_signals(df)
+    for sig in raw_signals:
+        if not sig.symbol:
+            sig.symbol = symbol
+
+    config = _make_backtest_config()
+    backtester_obj = Backtester(config)
+    bt_result = backtester_obj.run(raw_signals, bars)
+
+    return {
+        "symbol": symbol,
+        "return_pct": round(bt_result.metrics.get("total_return_pct", 0), 2),
+        "win_rate": round(bt_result.metrics.get("win_rate", 0), 2),
+        "sharpe_ratio": round(bt_result.metrics.get("sharpe_ratio", 0), 4),
+        "max_drawdown_pct": round(bt_result.metrics.get("max_drawdown_pct", 0), 2),
+        "total_trades": len(bt_result.trades),
+    }
+
+
+def _sse(data: dict) -> str:
+    """Format a dict as an SSE event line."""
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
 @api_router.post("/ai/generate-strategy")
 def api_generate_strategy(req: GenerateStrategyRequest):
     """AI 生成交易策略 + 单股快速回测。"""
@@ -333,84 +429,13 @@ def api_generate_strategy(req: GenerateStrategyRequest):
     if "error" in generated:
         return generated
 
-    # 2. Dynamically load and run backtest
+    # 2. Run backtest
     s, e = _resolve_dates(req.start, req.end, "1y")
-    backtest_result = None
     try:
-        strategy_code = generated["python_code"]
-        spec = importlib.util.spec_from_loader(
-            generated["name"], loader=None, origin="<ai_generated>")
-        if spec is None:
-            raise RuntimeError("Failed to create module spec")
-
-        module = importlib.util.module_from_spec(spec)
-        exec(strategy_code, module.__dict__)
-
-        # Find the strategy class in the module
-        strat_class = None
-        for attr_name in dir(module):
-            obj = getattr(module, attr_name)
-            if (isinstance(obj, type)
-                    and hasattr(obj, "generate_signals")
-                    and hasattr(obj, "name")
-                    and attr_name != "Strategy"):
-                strat_class = obj
-                break
-
-        if strat_class is None:
-            raise RuntimeError("未在生成的代码中找到策略类")
-
-        # Run backtest directly (bypass registry — the strategy isn't registered)
-        from autotrade.core.engine import _bars_to_dataframe, _make_backtest_config
-        from autotrade.core.backtester import Backtester
-        from autotrade.core.datasource_factory import build_datasource_from_name
-
-        # Instantiate the strategy from the dynamically loaded class
-        # Try with YAML params first, fall back to no-args if params mismatch
-        import yaml
-        strategy = None
-        try:
-            parsed_yaml = yaml.safe_load(generated["yaml_code"])
-            yaml_params = parsed_yaml.get("params", {}) if isinstance(parsed_yaml, dict) else {}
-            strategy = strat_class(**yaml_params)
-        except (TypeError, Exception):
-            try:
-                strategy = strat_class()
-            except Exception:
-                # Last resort: try with just the required params
-                import inspect
-                sig_params = inspect.signature(strat_class.__init__).parameters
-                # Filter YAML params to only those accepted by __init__
-                accepted = {k: v for k, v in yaml_params.items() if k in sig_params}
-                strategy = strat_class(**accepted) if accepted else strat_class()
-
-        ds = build_datasource_from_name("failover")
-        bars = ds.get_bars(req.symbol, s, e)
-        if not bars:
-            logger.warning("No bar data for %s in %s ~ %s", req.symbol, s, e)
-            backtest_result = {"error": f"未找到 {req.symbol} 在 {s} ~ {e} 的数据，请尝试其他股票代码或时间范围"}
-        else:
-            df = _bars_to_dataframe(bars)
-            for ind in strategy.required_indicators:
-                df = ind.compute(df)
-
-            raw_signals = strategy.generate_signals(df)
-            for sig in raw_signals:
-                if not sig.symbol:
-                    sig.symbol = req.symbol
-
-            config = _make_backtest_config()
-            backtester = Backtester(config)
-            result = backtester.run(raw_signals, bars)
-
-            backtest_result = {
-                "symbol": req.symbol,
-                "return_pct": round(result.metrics.get("total_return_pct", 0), 2),
-                "win_rate": round(result.metrics.get("win_rate", 0), 2),
-                "sharpe_ratio": round(result.metrics.get("sharpe_ratio", 0), 4),
-                "max_drawdown_pct": round(result.metrics.get("max_drawdown_pct", 0), 2),
-                "total_trades": len(result.trades),
-            }
+        backtest_result = _run_inline_backtest(
+            generated["python_code"], generated["yaml_code"],
+            req.symbol, s, e,
+        )
     except Exception as ex:
         logger.warning("Failed to backtest generated strategy: %s", ex)
         backtest_result = {"error": str(ex)}
@@ -495,75 +520,10 @@ def api_chat(req: ChatRequest):
         strategy_data = result["strategy"]
         s, e = _resolve_dates(req.start, req.end, "1y")
         try:
-            strategy_code = strategy_data["python_code"]
-            spec = importlib.util.spec_from_loader(
-                strategy_data["name"], loader=None, origin="<ai_chat>")
-            if spec is None:
-                raise RuntimeError("Failed to create module spec")
-
-            module = importlib.util.module_from_spec(spec)
-            exec(strategy_code, module.__dict__)
-
-            strat_class = None
-            for attr_name in dir(module):
-                obj = getattr(module, attr_name)
-                if (isinstance(obj, type)
-                        and hasattr(obj, "generate_signals")
-                        and hasattr(obj, "name")
-                        and attr_name != "Strategy"):
-                    strat_class = obj
-                    break
-
-            if strat_class is None:
-                raise RuntimeError("未在生成的代码中找到策略类")
-
-            from autotrade.core.engine import _bars_to_dataframe, _make_backtest_config
-            from autotrade.core.backtester import Backtester
-            from autotrade.core.datasource_factory import build_datasource_from_name
-
-            import yaml
-            strategy = None
-            try:
-                parsed_yaml = yaml.safe_load(strategy_data["yaml_code"])
-                yaml_params = parsed_yaml.get("params", {}) if isinstance(parsed_yaml, dict) else {}
-                strategy = strat_class(**yaml_params)
-            except (TypeError, Exception):
-                try:
-                    strategy = strat_class()
-                except Exception:
-                    import inspect
-                    sig_params = inspect.signature(strat_class.__init__).parameters
-                    accepted = {k: v for k, v in yaml_params.items() if k in sig_params}
-                    strategy = strat_class(**accepted) if accepted else strat_class()
-
-            ds = build_datasource_from_name("failover")
-            bars = ds.get_bars(req.symbol, s, e)
-            if not bars:
-                logger.warning("No bar data for %s in %s ~ %s", req.symbol, s, e)
-                backtest_result = {"error": f"未找到 {req.symbol} 在 {s} ~ {e} 的数据，请尝试其他股票代码或时间范围"}
-            if bars:
-                df = _bars_to_dataframe(bars)
-                for ind in strategy.required_indicators:
-                    df = ind.compute(df)
-
-                raw_signals = strategy.generate_signals(df)
-                for sig in raw_signals:
-                    if not sig.symbol:
-                        sig.symbol = req.symbol
-
-                config = _make_backtest_config()
-                backtester_obj = Backtester(config)
-                bt_result = backtester_obj.run(raw_signals, bars)
-
-                backtest_result = {
-                    "symbol": req.symbol,
-                    "return_pct": round(bt_result.metrics.get("total_return_pct", 0), 2),
-                    "win_rate": round(bt_result.metrics.get("win_rate", 0), 2),
-                    "sharpe_ratio": round(bt_result.metrics.get("sharpe_ratio", 0), 4),
-                    "max_drawdown_pct": round(bt_result.metrics.get("max_drawdown_pct", 0), 2),
-                    "total_trades": len(bt_result.trades),
-                }
-
+            backtest_result = _run_inline_backtest(
+                strategy_data["python_code"], strategy_data["yaml_code"],
+                req.symbol, s, e,
+            )
             # Update session's current strategy
             _session_store.update_strategy(
                 session_id,
@@ -596,6 +556,154 @@ def api_chat(req: ChatRequest):
         strategy=result.get("strategy"),
         backtest=backtest_result,
     ).model_dump()
+
+
+@api_router.post("/ai/chat/stream")
+async def api_chat_stream(req: ChatRequest):
+    """多轮对话式 AI 策略生成（SSE 流式推送进度 + 自动修复回测错误）。
+
+    返回 text/event-stream，事件类型:
+      - progress: {step, message, attempt?}
+      - done: {result: ChatResponse}
+    """
+    from autotrade.ai.strategy_generator import StrategyGenerator
+
+    api_key = _get_deepseek_api_key()
+    if not api_key:
+        # 返回 SSE 格式的错误
+        async def error_gen():
+            yield _sse({"type": "done", "result": {"error": "未配置 DEEPSEEK_API_KEY 环境变量"}})
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    MAX_RETRIES = 3
+
+    # Get or create session
+    session = None
+    if req.session_id:
+        session = _session_store.get_session(req.session_id)
+    if session is None:
+        title = req.prompt[:50] if len(req.prompt) > 50 else req.prompt
+        session = _session_store.create_session(title=title)
+
+    session_id = session.session_id
+
+    # Save user message
+    user_msg = StoreChatMessage(
+        role="user", content=req.prompt,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+    )
+    prior_messages = list(session.messages)
+    _session_store.add_message(session_id, user_msg)
+
+    # Build conversation history
+    history = []
+    for m in prior_messages:
+        msg_dict = {"role": m.role, "content": m.content}
+        if m.strategy: msg_dict["strategy"] = m.strategy
+        if m.backtest: msg_dict["backtest"] = m.backtest
+        history.append(msg_dict)
+
+    gen = StrategyGenerator(api_key=api_key)
+    s, e = _resolve_dates(req.start, req.end, "1y")
+
+    async def event_generator():
+        # ---- Phase 1: Generate ----
+        yield _sse({"type": "progress", "step": "generating",
+                     "message": "AI 正在生成策略..."})
+
+        result = gen.chat(history, req.prompt)
+
+        if "error" in result:
+            yield _sse({"type": "done", "result": {"error": result["error"]}})
+            return
+
+        yield _sse({"type": "progress", "step": "generated",
+                     "message": "策略已生成，开始回测验证..."})
+
+        # ---- Phase 2: Backtest + Fix loop ----
+        strategy_data = result.get("strategy")
+        backtest_result = None
+
+        if strategy_data and result.get("action") in ("generate", "modify"):
+            for attempt in range(1, MAX_RETRIES + 1):
+                yield _sse({"type": "progress", "step": "backtesting",
+                             "message": f"正在运行回测 (第{attempt}次)...",
+                             "attempt": attempt})
+
+                try:
+                    backtest_result = _run_inline_backtest(
+                        strategy_data["python_code"],
+                        strategy_data["yaml_code"],
+                        req.symbol, s, e,
+                    )
+                except Exception as ex:
+                    backtest_result = {"error": str(ex)}
+
+                if backtest_result.get("error"):
+                    error_msg = backtest_result["error"]
+                    if attempt >= MAX_RETRIES:
+                        yield _sse({"type": "progress", "step": "failed",
+                                     "message": f"回测失败 (已重试{MAX_RETRIES}次): {error_msg}"})
+                        break
+
+                    yield _sse({"type": "progress", "step": "fixing",
+                                 "message": f"回测失败: {error_msg}，AI 正在修复...",
+                                 "attempt": attempt})
+
+                    # Ask AI to fix
+                    result = gen.fix_strategy(
+                        history, req.prompt,
+                        strategy_data["python_code"], error_msg,
+                    )
+                    if "error" in result:
+                        yield _sse({"type": "done",
+                                     "result": {"error": f"AI 修复失败: {result['error']}"}})
+                        return
+                    strategy_data = result.get("strategy")
+                    if not strategy_data:
+                        yield _sse({"type": "done",
+                                     "result": {"error": "AI 修复后未返回策略代码"}})
+                        return
+                else:
+                    # Success!
+                    yield _sse({"type": "progress", "step": "backtest_ok",
+                                 "message": f"回测通过！收益率: {backtest_result.get('return_pct', 0):+.1f}%, "
+                                           f"胜率: {backtest_result.get('win_rate', 0):.0f}%, "
+                                           f"交易: {backtest_result.get('total_trades', 0)}笔"})
+                    break
+
+            # Update session's current strategy
+            if strategy_data:
+                _session_store.update_strategy(
+                    session_id,
+                    strategy_data["python_code"],
+                    strategy_data["yaml_code"],
+                )
+
+        # ---- Phase 3: Done ----
+        assistant_msg = StoreChatMessage(
+            role="assistant",
+            content=result.get("message", ""),
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            strategy=result.get("strategy"),
+            backtest=backtest_result,
+        )
+        _session_store.add_message(session_id, assistant_msg)
+
+        yield _sse({"type": "done", "result": ChatResponse(
+            session_id=session_id,
+            message=ChatMessageResponse(
+                role="assistant",
+                content=result.get("message", ""),
+                timestamp=assistant_msg.timestamp,
+                strategy=result.get("strategy"),
+                backtest=backtest_result,
+            ),
+            strategy=result.get("strategy"),
+            backtest=backtest_result,
+        ).model_dump()})
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @api_router.get("/ai/chat/{session_id}")

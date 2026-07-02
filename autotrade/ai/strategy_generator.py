@@ -223,6 +223,37 @@ class StrategyGenerator:
 
         return result
 
+    def fix_strategy(
+        self,
+        history: list[dict],
+        user_prompt: str,
+        failed_code: str,
+        error_msg: str,
+    ) -> dict:
+        """将回测错误反馈给 AI，让它修复策略代码。
+
+        Args:
+            history: 对话历史
+            user_prompt: 用户原始需求
+            failed_code: 失败的策略 Python 代码
+            error_msg: 回测错误信息
+
+        Returns:
+            与 chat() 相同格式的响应 dict
+        """
+        # 截断过长代码，保留后 3000 字符（包含核心逻辑）
+        truncated = failed_code
+        if len(failed_code) > 3000:
+            truncated = "# ... (前段省略)\n" + failed_code[-3000:]
+
+        fix_prompt = (
+            f"之前生成的策略在回测时出现错误，请分析并修复。\n\n"
+            f"错误信息: {error_msg}\n\n"
+            f"失败的策略代码:\n```python\n{truncated}\n```\n\n"
+            f"请修复错误并重新输出完整的策略代码（name 保持不变，action=modify）。"
+        )
+        return self.chat(history, fix_prompt)
+
     def _build_chat_prompt(self, conversation_history: list[dict], current_prompt: str) -> str:
         """Build the chat prompt with conversation history context."""
         # Format history as readable text, compressing strategy code for token efficiency

@@ -341,3 +341,12 @@ export interface ScreenResult {
   with_buy_signal: number
   results: ScreenItem[]
 }
+
+// ---- SSE 流事件 ----
+export interface SseEvent {
+  type: 'progress' | 'done'
+  step?: string
+  message?: string
+  attempt?: number
+  result?: ChatResponse
+}

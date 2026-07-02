@@ -22,6 +22,7 @@ import type {
   ScreenerInfo,
   ScreenRequest,
   ScreenResult,
+  SseEvent,
 } from '@/types'
 
 const BASE = '/api'
@@ -204,6 +205,56 @@ export const api = {
   deleteStrategy: (name: string) => del<DeleteStrategyResponse>(`/strategies/${name}`),
 
   chat: (params: ChatRequest) => post<ChatResponse>('/ai/chat', params),
+
+  /** SSE streaming chat — receives progress events and final result. Returns AbortController for cancellation. */
+  chatStream: (
+    params: ChatRequest,
+    onEvent: (event: SseEvent) => void,
+    onError: (err: Error) => void,
+    onDone: () => void,
+  ): AbortController => {
+    const controller = new AbortController()
+    const token = getToken()
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    fetch(BASE + '/ai/chat/stream', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+      signal: controller.signal,
+    }).then(async (res) => {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        onError(new Error(data.detail || data.error || `HTTP ${res.status}`))
+        return
+      }
+      const reader = res.body?.getReader()
+      if (!reader) { onError(new Error('No response body')); return }
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        let dataLine = ''
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            dataLine = line.slice(6)
+          } else if (line === '' && dataLine) {
+            try { onEvent(JSON.parse(dataLine) as SseEvent) } catch { /* skip */ }
+            dataLine = ''
+          }
+        }
+      }
+    }).catch((err) => {
+      if ((err as Error).name !== 'AbortError') onError(err as Error)
+    }).finally(() => onDone())
+
+    return controller
+  },
 
   getChatHistory: (sessionId: string) =>
     get<ChatHistoryResponse>('/ai/chat/' + encodeURIComponent(sessionId)),

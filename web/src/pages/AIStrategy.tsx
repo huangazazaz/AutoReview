@@ -7,7 +7,9 @@ import ChatMessages from '@/components/ChatMessages'
 import ChatSessionList from '@/components/ChatSessionList'
 import ChatInput from '@/components/ChatInput'
 import { MAX_DATE } from '@/utils/date'
-import type { ChatMessage, ChatSession, StrategyResult } from '@/types'
+import type { ChatMessage, ChatSession, StrategyResult, SseEvent } from '@/types'
+
+interface ProgressStep { step: string; message: string }
 
 export default function AIStrategy() {
   const { showToast, showLoading: showGlobalLoading, hideLoading } = useApp()
@@ -20,8 +22,10 @@ export default function AIStrategy() {
   const [activeSessionId, setActiveSessionId] = useState<string>()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [sending, setSending] = useState(false)
+  const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([])
   const [nextId, setNextId] = useState(1)
   const [exampleFillText, setExampleFillText] = useState('')
+  const streamCtrlRef = useRef<AbortController | null>(null)
 
   // Load active session on mount
   const initialLoadDone = useRef(false)
@@ -78,57 +82,76 @@ export default function AIStrategy() {
     setNextId(n => n + 1)
 
     setSending(true)
-    showGlobalLoading('AI 正在思考...')
-    try {
-      const result = await api.chat({
-        session_id: activeSessionId,
-        prompt: text,
-        symbol,
-        start: startDate || undefined,
-        end: endDate || undefined,
-      })
+    setProgressSteps([])
 
-      const newSessionId = result.session_id
-      if (!activeSessionId) {
-        setActiveSessionId(newSessionId)
-        localStorage.setItem('ai_chat_active_session', newSessionId)
-        // Add to sessions list
-        setSessions(prev => {
-          if (prev.find(s => s.session_id === newSessionId)) return prev
-          return [{
-            session_id: newSessionId,
-            title: text.length > 50 ? text.slice(0, 50) : text,
-            created_at: new Date().toISOString(),
-            last_active: new Date().toISOString(),
-            message_count: 2,
-          }, ...prev]
-        })
-      }
+    // Collect progress events
+    const steps: ProgressStep[] = []
 
-      const aiMsg: ChatMessage = {
-        id: nextId + 1,
-        role: 'assistant',
-        content: result.message.content,
-        timestamp: result.message.timestamp,
-        strategy: result.strategy,
-        backtest: result.backtest,
-        codeExpanded: false,
-      }
-      setMessages(prev => [...prev, aiMsg])
-      setNextId(n => n + 2)
+    streamCtrlRef.current = api.chatStream(
+      { session_id: activeSessionId, prompt: text, symbol,
+        start: startDate || undefined, end: endDate || undefined },
+      (event: SseEvent) => {
+        if (event.type === 'progress' && event.step && event.message) {
+          steps.push({ step: event.step, message: event.message })
+          setProgressSteps([...steps])
+        } else if (event.type === 'done') {
+          const result = event.result
+          if (!result) return
 
-      // Update session in list
-      setSessions(prev => prev.map(s =>
-        s.session_id === newSessionId
-          ? { ...s, last_active: new Date().toISOString(), message_count: s.message_count + 2 }
-          : s
-      ))
-    } catch (err) {
-      showToast('发送失败: ' + (err as Error).message, 'error')
-    } finally {
-      setSending(false)
-      hideLoading()
-    }
+          // Handle error
+          if ('error' in result && result.error) {
+            showToast('AI 策略生成失败: ' + result.error, 'error')
+            setSending(false)
+            return
+          }
+
+          const newSessionId = result.session_id
+          if (!activeSessionId) {
+            setActiveSessionId(newSessionId)
+            localStorage.setItem('ai_chat_active_session', newSessionId)
+            setSessions(prev => {
+              if (prev.find(s => s.session_id === newSessionId)) return prev
+              return [{
+                session_id: newSessionId,
+                title: text.length > 50 ? text.slice(0, 50) : text,
+                created_at: new Date().toISOString(),
+                last_active: new Date().toISOString(),
+                message_count: 2,
+              }, ...prev]
+            })
+          }
+
+          const aiMsg: ChatMessage = {
+            id: nextId + 1,
+            role: 'assistant',
+            content: result.message?.content || '',
+            timestamp: result.message?.timestamp || new Date().toISOString(),
+            strategy: result.strategy,
+            backtest: result.backtest,
+            codeExpanded: false,
+          }
+          setMessages(prev => [...prev, aiMsg])
+          setNextId(n => n + 2)
+
+          setSessions(prev => prev.map(s =>
+            s.session_id === newSessionId
+              ? { ...s, last_active: new Date().toISOString(), message_count: s.message_count + 2 }
+              : s
+          ))
+
+          setSending(false)
+          setProgressSteps([])
+        }
+      },
+      (err: Error) => {
+        showToast('发送失败: ' + err.message, 'error')
+        setSending(false)
+        setProgressSteps([])
+      },
+      () => {
+        // stream done (may have already been handled by done event)
+      },
+    )
   }, [sending, activeSessionId, symbol, startDate, endDate, nextId])
 
   const handleNewSession = useCallback(() => {
@@ -238,6 +261,7 @@ export default function AIStrategy() {
             <ChatMessages
               messages={messages}
               sending={sending}
+              progressSteps={progressSteps.length > 0 ? progressSteps : undefined}
               onCodeExpand={handleCodeExpand}
               onSave={handleSave}
               onDelete={handleDelete}

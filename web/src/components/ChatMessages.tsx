@@ -2,6 +2,11 @@ import { useRef, useEffect } from 'react'
 import type { ChatMessage as ChatMessageType, StrategyResult } from '@/types'
 import ChatBubble from './ChatBubble'
 
+interface ProgressStep {
+  step: string
+  message: string
+}
+
 interface ChatMessagesProps {
   messages: ChatMessageType[]
   onCodeExpand: (id: number) => void
@@ -9,6 +14,16 @@ interface ChatMessagesProps {
   onDelete?: (name: string) => void
   onCopy?: (code: string) => void
   sending?: boolean
+  progressSteps?: ProgressStep[]
+}
+
+const STEP_ICONS: Record<string, string> = {
+  generating: '⏳',
+  generated: '✅',
+  backtesting: '⏳',
+  backtest_ok: '✅',
+  fixing: '🔧',
+  failed: '❌',
 }
 
 export default function ChatMessages({
@@ -18,12 +33,13 @@ export default function ChatMessages({
   onDelete,
   onCopy,
   sending,
+  progressSteps,
 }: ChatMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, sending])
+  }, [messages, sending, progressSteps])
 
   return (
     <div style={{ flex: 1 }}>
@@ -57,10 +73,28 @@ export default function ChatMessages({
             padding: '12px 18px', borderRadius: 'var(--radius-lg)',
             background: 'linear-gradient(135deg, rgba(30,41,59,0.95) 0%, rgba(40,53,72,0.95) 100%)',
             border: '1px solid var(--border-light)',
-            display: 'flex', alignItems: 'center', gap: 8,
+            display: 'flex', flexDirection: 'column', gap: 6,
+            minWidth: 280,
           }}>
-            <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }}></div>
-            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>AI 正在思考...</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }}></div>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                AI 正在处理...
+              </span>
+            </div>
+            {progressSteps && progressSteps.length > 0 && (
+              <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {progressSteps.map((s, i) => (
+                  <div key={i} style={{
+                    fontSize: 12, color: s.step === 'failed' ? 'var(--danger)' : 'var(--text-muted)',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    <span>{STEP_ICONS[s.step] || '⏳'}</span>
+                    <span>{s.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

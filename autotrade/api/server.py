@@ -747,18 +747,14 @@ def api_delete_chat(session_id: str):
 
 @api_router.post("/strategies/save")
 def api_save_strategy(req: SaveStrategyRequest):
-    """保存 AI 生成的策略到文件系统。"""
-    from autotrade.ai.strategy_generator import StrategyGenerator
-    from autotrade.registry import init_registry as reload_registry
+    """保存 AI 生成的策略到文件系统（已存在则覆盖）。"""
+    from autotrade.registry import register_strategy, init_registry as reload_registry
 
     if is_builtin_strategy(req.name):
         return {"error": f"不能覆盖内置策略: {req.name}"}
 
     py_path = Path(__file__).resolve().parent.parent / "strategies" / f"{req.name}.py"
     yaml_path = Path(__file__).resolve().parent.parent.parent / "config" / "strategies" / f"{req.name}.yaml"
-
-    if py_path.exists() or yaml_path.exists():
-        return {"error": f"策略 {req.name} 已存在，请先删除或使用不同名称"}
 
     py_path.parent.mkdir(parents=True, exist_ok=True)
     yaml_path.parent.mkdir(parents=True, exist_ok=True)
@@ -768,17 +764,35 @@ def api_save_strategy(req: SaveStrategyRequest):
     with open(yaml_path, "w", encoding="utf-8") as f:
         f.write(req.yaml_code)
 
-    reload_registry(force=True)
-
-    # Verify strategy registered successfully (check for import/syntax errors)
-    from autotrade.registry import get_strategy
+    # Try to register just this strategy without full registry rescan
     try:
-        get_strategy(req.name)
-    except ValueError as e:
-        # Roll back — delete the saved files
-        py_path.unlink(missing_ok=True)
-        yaml_path.unlink(missing_ok=True)
-        return {"error": f"策略保存成功但无法加载: {e}。请检查代码是否有语法错误或缺失导入。"}
+        import importlib, sys
+        modname = f"autotrade.strategies.{req.name}"
+        # Remove cached module if it was previously loaded
+        if modname in sys.modules:
+            del sys.modules[modname]
+        module = importlib.import_module(modname)
+        # Find and register the strategy class
+        from autotrade.core.interfaces import Strategy
+        for attr_name in dir(module):
+            obj = getattr(module, attr_name)
+            if (isinstance(obj, type) and issubclass(obj, Strategy)
+                    and hasattr(obj, "name") and attr_name != "Strategy"):
+                register_strategy(obj.name, obj)
+                break
+        else:
+            raise ValueError("未在模块中找到策略类")
+    except Exception as e:
+        # Full rescan as fallback
+        reload_registry(force=True)
+        from autotrade.registry import get_strategy
+        try:
+            get_strategy(req.name)
+        except ValueError:
+            # Still not found — roll back
+            py_path.unlink(missing_ok=True)
+            yaml_path.unlink(missing_ok=True)
+            return {"error": f"策略保存成功但无法加载: {e}。请检查代码是否有语法错误或缺失导入。"}
 
     return {
         "success": True,
